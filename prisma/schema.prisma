@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("user")   // ← this must exist
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents     Document[]
+  conversations Conversation[]
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  fileName    String
+  fileUrl     String
+  fileType    String
+  fileSize    Int
+  status      String   @default("processing")
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks      Chunk[]
+  conversations Conversation[]
+}
+
+model Chunk {
+  id          String   @id @default(cuid())
+  content     String
+  chunkIndex  Int
+  pineconeId  String
+  documentId  String
+  createdAt   DateTime @default(now())
+
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id         String    @id @default(cuid())
+  userId     String
+  documentId String
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  messages   Message[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  role           String   // "user" or "assistant"
+  content        String
+  conversationId String
+  createdAt      DateTime @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
