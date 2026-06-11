@@ -5,11 +5,39 @@ import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
 import { supabaseAdmin } from '@/lib/supabase/client'
 
-export async function DELETE(
+export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+    const { userId } = verifyToken(req)
+
+    const user = await userRepository.findById(userId)
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!hasPermission(user.role, 'document:read')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const document = await documentRepository.findById(id)
+    if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    if (document.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    return NextResponse.json({ document }, { status: 200 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Request failed'
+    return NextResponse.json({ error: message }, { status: 401 })
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
     const { userId } = verifyToken(req)
 
     const user = await userRepository.findById(userId)
@@ -18,7 +46,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const document = await documentRepository.findById(params.id)
+    const document = await documentRepository.findById(id)
     if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     if (document.userId !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -29,7 +57,7 @@ export async function DELETE(
     await supabaseAdmin.storage.from('documents').remove([filePath])
 
     // Delete from DB (cascades to chunks)
-    await documentRepository.delete(params.id)
+    await documentRepository.delete(id)
 
     return NextResponse.json({ message: 'Document deleted successfully' }, { status: 200 })
 

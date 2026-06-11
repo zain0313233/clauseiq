@@ -1,0 +1,40 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyToken } from '@/lib/auth'
+import { userRepository } from '@/repositories/user.repository'
+import { templateRepository } from '@/repositories/template.repository'
+import { hasPermission } from '@/lib/rbac'
+import { supabaseAdmin } from '@/lib/supabase/client'
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const { userId } = verifyToken(req)
+
+    const user = await userRepository.findById(userId)
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!hasPermission(user.role, 'document:delete')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const template = await templateRepository.findById(id)
+    if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+    if (template.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const filePath = template.fileUrl.split('/documents/')[1]
+    if (filePath) {
+      await supabaseAdmin.storage.from('documents').remove([filePath])
+    }
+
+    await templateRepository.delete(id)
+
+    return NextResponse.json({ message: 'Template deleted' }, { status: 200 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Request failed'
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
+}

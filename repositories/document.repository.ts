@@ -15,12 +15,24 @@ export const documentRepository = {
   findByUserId: async (userId: string) => {
     return prisma.document.findMany({
       where: { userId },
+      include: { analysis: true, agentReport: true },
+      orderBy: { createdAt: 'desc' },
+    })
+  },
+
+  findReadyByUserId: async (userId: string) => {
+    return prisma.document.findMany({
+      where: { userId, status: 'ready' },
+      select: { id: true, title: true },
       orderBy: { createdAt: 'desc' },
     })
   },
 
   findById: async (id: string) => {
-    return prisma.document.findUnique({ where: { id } })
+    return prisma.document.findUnique({
+      where: { id },
+      include: { analysis: true, agentReport: true },
+    })
   },
 
   updateStatus: async (id: string, status: string) => {

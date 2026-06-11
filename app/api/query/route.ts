@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
-import { aiService } from '@/services/ai.service'
+import { queryService } from '@/services/query.service'
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,20 +15,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { document_id, question } = body
+    const { document_id, question, mode } = body
 
     if (!document_id) return NextResponse.json({ error: 'document_id is required' }, { status: 400 })
-    if (!question) return NextResponse.json({ error: 'question is required' }, { status: 400 })
+    if (!question?.trim()) return NextResponse.json({ error: 'question is required' }, { status: 400 })
 
-    const result = await aiService.queryDocument({
-      document_id,
-      question,
-      user_id: userId,
-    })
+    const queryMode = mode === 'plain_english' ? 'plain_english' : 'default'
+    const result = await queryService.ask(userId, document_id, question.trim(), queryMode)
 
     return NextResponse.json(result, { status: 200 })
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Query failed'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }
