@@ -48,7 +48,6 @@ import { Badge } from "@/components/ui/badge"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import { authHeaders } from "@/lib/auth-client"
 
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 
@@ -216,9 +215,9 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
       const [docRes, analysisRes] = await Promise.all([
 
-        fetch(`/api/documents/${documentId}`, { headers: authHeaders() }),
+        fetch(`/api/documents/${documentId}`, { credentials: "include" }),
 
-        fetch(`/api/documents/${documentId}/analysis`, { headers: authHeaders() }),
+        fetch(`/api/documents/${documentId}/analysis`, { credentials: "include" }),
 
       ])
 
@@ -292,7 +291,7 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
         method: "POST",
 
-        headers: authHeaders(),
+        credentials: "include",
 
       })
 

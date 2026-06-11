@@ -12,4 +12,11 @@ export const userRepository = {
   create: async (data: { name: string; email: string; password: string }) => {
     return prisma.user.create({ data })
   },
+
+  incrementTokenVersion: async (id: string) => {
+    return prisma.user.update({
+      where: { id },
+      data: { tokenVersion: { increment: 1 } },
+    })
+  },
 }

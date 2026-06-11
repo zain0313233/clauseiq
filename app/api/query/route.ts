@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
@@ -8,10 +8,8 @@ import { queryService } from '@/services/query.service'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'query:ask')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -29,11 +27,8 @@ export async function POST(req: NextRequest) {
     }
 
     const document = await documentRepository.findById(document_id)
-    if (!document) {
+    if (!document || document.userId !== userId) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    }
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const queryMode = mode === 'plain_english' ? 'plain_english' : 'default'

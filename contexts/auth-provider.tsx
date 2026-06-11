@@ -8,19 +8,12 @@ import {
   useState,
 } from "react"
 import { useRouter } from "next/navigation"
-import {
-  AuthUser,
-  clearAuth,
-  getToken,
-  getUser,
-  setAuth,
-} from "@/lib/auth-client"
+import { AuthUser } from "@/lib/auth-client"
 
 type AuthContextValue = {
   user: AuthUser | null
-  token: string | null
   isLoading: boolean
-  login: (token: string, user: AuthUser) => void
+  login: (user: AuthUser) => void
   logout: () => void
 }
 
@@ -28,29 +21,41 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setToken(getToken())
-    setUser(getUser())
-    setIsLoading(false)
+    localStorage.removeItem("clauseiq_token")
+    localStorage.removeItem("clauseiq_user")
+
+    fetch("/api/me", { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) return null
+        const data = (await res.json()) as { user: AuthUser | null }
+        return data.user
+      })
+      .then((sessionUser) => setUser(sessionUser))
+      .catch(() => setUser(null))
+      .finally(() => setIsLoading(false))
   }, [])
 
-  const login = useCallback((newToken: string, newUser: AuthUser) => {
-    setAuth(newToken, newUser)
-    setToken(newToken)
+  const login = useCallback((newUser: AuthUser) => {
     setUser(newUser)
   }, [])
 
-  const logout = useCallback(() => {
-    clearAuth()
-    setToken(null)
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+    } catch {
+      // Clear client state even if revocation request fails
+    }
     setUser(null)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

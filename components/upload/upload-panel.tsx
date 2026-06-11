@@ -22,7 +22,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 
 const ACCEPT =
@@ -102,7 +101,7 @@ export function UploadPanel() {
 
       const res = await fetch("/api/upload", {
         method: "POST",
-        headers: authHeaders(),
+        credentials: "include",
         body: formData,
       })
 

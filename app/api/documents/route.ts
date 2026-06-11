@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import type { PortfolioFilter } from '@/lib/document-filters'
 import { parseLimit, parsePage } from '@/lib/pagination'
 import { documentRepository } from '@/repositories/document.repository'
@@ -16,16 +16,19 @@ const PORTFOLIO_FILTERS = new Set([
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = req.nextUrl
     const pageParam = searchParams.get('page')
+
+    if (searchParams.get('chat') === '1') {
+      const documents = await documentRepository.findChatListByUserId(userId)
+      return NextResponse.json({ documents }, { status: 200 })
+    }
 
     if (pageParam !== null) {
       const page = parsePage(pageParam)

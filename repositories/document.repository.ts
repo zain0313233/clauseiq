@@ -194,6 +194,14 @@ export const documentRepository = {
     })
   },
 
+  findChatListByUserId: async (userId: string) => {
+    return prisma.document.findMany({
+      where: { userId },
+      select: { id: true, title: true, status: true },
+      orderBy: { createdAt: 'desc' },
+    })
+  },
+
   findById: async (id: string) => {
     return prisma.document.findUnique({
       where: { id },

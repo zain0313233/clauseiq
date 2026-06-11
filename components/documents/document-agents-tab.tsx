@@ -16,7 +16,6 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 import { cn } from "@/lib/utils"
 import type { AgentOpinion, AgentReport } from "@/types/agents"
@@ -56,7 +55,7 @@ export function DocumentAgentsTab({
   const fetchReport = useCallback(async () => {
     try {
       const res = await fetch(`/api/documents/${documentId}/agents`, {
-        headers: authHeaders(),
+        credentials: "include",
       })
       const data = await res.json()
       if (res.ok) setReport(data.report)
@@ -80,7 +79,7 @@ export function DocumentAgentsTab({
     try {
       const res = await fetch(`/api/documents/${documentId}/agents`, {
         method: "POST",
-        headers: authHeaders(),
+        credentials: "include",
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

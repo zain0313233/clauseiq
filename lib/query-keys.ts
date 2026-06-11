@@ -5,6 +5,7 @@ export type DocumentListStatus = 'all' | 'ready' | 'processing' | 'failed'
 export const queryKeys = {
   documents: {
     all: () => ['documents', 'all'] as const,
+    chat: () => ['documents', 'chat'] as const,
     list: (params: {
       page: number
       limit: number

@@ -1,7 +1,6 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { authHeaders } from "@/lib/auth-client"
 import { fetchJson } from "@/lib/api-client"
 import { queryKeys } from "@/lib/query-keys"
 import { invalidateTemplates } from "@/hooks/query-utils"
@@ -26,7 +25,7 @@ export function useUploadTemplateMutation() {
     mutationFn: async (formData: FormData) => {
       const res = await fetch("/api/templates", {
         method: "POST",
-        headers: authHeaders(),
+        credentials: "include",
         body: formData,
       })
       const data = await res.json()
@@ -44,7 +43,7 @@ export function useDeleteTemplateMutation() {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/templates/${id}`, {
         method: "DELETE",
-        headers: authHeaders(),
+        credentials: "include",
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Delete failed")

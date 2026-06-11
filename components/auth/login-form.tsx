@@ -33,13 +33,14 @@ export function LoginForm() {
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Login failed")
 
-      login(data.token, data.user)
+      login(data.user)
       toast.success("Welcome back!")
       router.push("/dashboard")
     } catch (err) {

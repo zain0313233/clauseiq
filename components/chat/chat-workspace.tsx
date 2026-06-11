@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button"
 import { ChatInbox } from "./chat-inbox"
 import { ChatMessageBubble } from "./chat-message"
 import { ChatInput } from "./chat-input"
-import { authHeaders } from "@/lib/auth-client"
 import {
   CLAUSEMIND_NAME,
   CLAUSEMIND_TAGLINE,
@@ -107,9 +106,17 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     }
   }, [])
 
-  useDocumentPolling(documents, () => {
-    void refetchDocuments()
-  })
+  const hasProcessing = documents.some(
+    (d) => d.status === "processing" || d.status === "pending"
+  )
+
+  useDocumentPolling(
+    documents,
+    () => {
+      void refetchDocuments()
+    },
+    hasProcessing
+  )
 
   useEffect(() => {
     if (initialDocumentId) setSelectedId(initialDocumentId)
@@ -118,7 +125,7 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const loadConversation = useCallback(async (docId: string, title: string) => {
     try {
       const res = await fetch(`/api/conversations/${docId}`, {
-        headers: authHeaders(),
+        credentials: "include",
       })
       const data = await res.json()
       if (!res.ok || !data.messages?.length) {
@@ -167,20 +174,19 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const handleStatusChange = useCallback(
     (status: string) => {
       if (!selectedId) return
-      queryClient.setQueryData<{ documents: ChatDocument[] }>(
-        queryKeys.documents.all(),
-        (prev) => ({
-          documents: (prev?.documents ?? []).map((d) =>
+      queryClient.setQueryData<ChatDocument[]>(
+        queryKeys.documents.chat(),
+        (prev) =>
+          (prev ?? []).map((d) =>
             d.id === selectedId ? { ...d, status } : d
-          ),
-        })
+          )
       )
     },
     [selectedId, queryClient]
   )
 
   useSingleDocumentPolling(
-    selectedId,
+    hasProcessing ? null : selectedId,
     selectedDoc?.status,
     handleStatusChange
   )
@@ -219,9 +225,6 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     if (!doc || doc.status !== "ready") return
     setSelectedId(id)
     router.push(`/chat/${id}`, { scroll: false })
-    if (!messagesByDoc[id]) {
-      loadConversation(id, doc.title)
-    }
   }
 
   function appendMessage(docId: string, message: ChatMessage) {
@@ -246,9 +249,9 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     try {
       const res = await fetch("/api/query", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders(),
         },
         body: JSON.stringify({
           document_id: selectedId,

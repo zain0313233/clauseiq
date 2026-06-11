@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import { userRepository } from '@/repositories/user.repository'
 import { templateRepository } from '@/repositories/template.repository'
 import { hasPermission } from '@/lib/rbac'
@@ -11,18 +11,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:delete')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const template = await templateRepository.findById(id)
-    if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
-    if (template.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!template || template.userId !== userId) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 })
     }
 
     await removeStorageObject(template.fileUrl)

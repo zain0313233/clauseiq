@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String
-  role      String   @default("user")   // ← this must exist
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  password     String
+  role         String   @default("user")
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   documents         Document[]
   conversations     Conversation[]
@@ -156,6 +157,7 @@ model DocumentComparison {
   template        StandardTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, templateId])
+  @@index([documentId, status])
 }
 
 model SiteTheme {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { analysisRepository } from '@/repositories/analysis.repository'
 import { userRepository } from '@/repositories/user.repository'
@@ -12,18 +12,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const document = await documentRepository.findById(id)
-    if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!document || document.userId !== userId) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
     const analysis = document.analysis ?? await analysisRepository.findByDocumentId(id)
@@ -41,18 +38,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const document = await documentRepository.findById(id)
-    if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!document || document.userId !== userId) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
     if (document.status !== 'ready') {
       return NextResponse.json({ error: 'Document must be ready before analysis' }, { status: 400 })
@@ -62,6 +56,7 @@ export async function POST(
       document_id: id,
       file_url: document.fileUrl,
       file_type: document.fileType,
+      user_id: userId,
     })
 
     return NextResponse.json({ message: 'Analysis started' }, { status: 202 })

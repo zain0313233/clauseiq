@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
 import { removeStorageObject } from '@/lib/storage'
+import { deleteDocumentVectorsWithRetry } from '@/lib/pinecone-delete'
 
 export async function GET(
   req: NextRequest,
@@ -11,18 +12,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const document = await documentRepository.findById(id)
-    if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!document || document.userId !== userId) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
     return NextResponse.json({ document }, { status: 200 })
@@ -38,28 +36,31 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:delete')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const document = await documentRepository.findById(id)
-    if (!document) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!document || document.userId !== userId) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
+
+    await deleteDocumentVectorsWithRetry(id, userId)
 
     await removeStorageObject(document.fileUrl)
 
-    // Delete from DB (cascades to chunks)
     await documentRepository.delete(id)
 
     return NextResponse.json({ message: 'Document deleted successfully' }, { status: 200 })
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Delete failed'
+    const isEngineAuth =
+      message.includes('AI engine authentication failed') ||
+      message.includes('ENGINE_API_SECRET')
+    const status = isEngineAuth ? 502 : message.includes('purge') ? 502 : 400
+    return NextResponse.json({ error: message }, { status })
   }
 }

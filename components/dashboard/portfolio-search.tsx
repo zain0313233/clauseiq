@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 import { cn } from "@/lib/utils"
 import type { PortfolioSource, QueryConfidence } from "@/lib/clausemind"
@@ -43,9 +42,9 @@ export function PortfolioSearch() {
     try {
       const res = await fetch("/api/query/portfolio", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders(),
         },
         body: JSON.stringify({ question: text }),
       })

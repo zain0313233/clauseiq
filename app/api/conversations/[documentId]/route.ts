@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { verifyToken } from "@/lib/auth"
+import { requireAuthUser } from '@/lib/auth-session'
 import { userRepository } from "@/repositories/user.repository"
 import { documentRepository } from "@/repositories/document.repository"
 import { conversationRepository } from "@/repositories/conversation.repository"
@@ -13,18 +13,15 @@ export async function GET(
 ) {
   try {
     const { documentId } = await params
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, "conversation:read")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const document = await documentRepository.findById(documentId)
-    if (!document) return NextResponse.json({ error: "Document not found" }, { status: 404 })
-    if (document.userId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!document || document.userId !== userId) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 })
     }
 
     const conversation = await conversationRepository.findByUserAndDocument(

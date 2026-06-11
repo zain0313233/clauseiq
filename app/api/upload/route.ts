@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { requireAuthUser } from '@/lib/auth-session'
 import { validateUploadFile } from '@/lib/file-validation'
 import { uploadService } from '@/services/upload.service'
 import { userRepository } from '@/repositories/user.repository'
@@ -8,10 +8,8 @@ import { aiService } from '@/services/ai.service'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = verifyToken(req)
-
-    const user = await userRepository.findById(userId)
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const user = await requireAuthUser(req)
+    const userId = user.id
     if (!hasPermission(user.role, 'document:upload')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
