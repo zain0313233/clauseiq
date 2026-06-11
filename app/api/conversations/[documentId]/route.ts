@@ -3,6 +3,8 @@ import { verifyToken } from "@/lib/auth"
 import { userRepository } from "@/repositories/user.repository"
 import { documentRepository } from "@/repositories/document.repository"
 import { conversationRepository } from "@/repositories/conversation.repository"
+import { CACHE } from "@/lib/cache-headers"
+import { normalizeStoredSources } from "@/lib/message-metadata"
 import { hasPermission } from "@/lib/rbac"
 
 export async function GET(
@@ -34,15 +36,30 @@ export async function GET(
       return NextResponse.json({ messages: [] }, { status: 200 })
     }
 
-    const messages = conversation.messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      metadata: m.metadata,
-      createdAt: m.createdAt.toISOString(),
-    }))
+    const messages = conversation.messages.map((m) => {
+      const metadata = m.metadata as {
+        sources?: unknown
+        confidence?: string
+      } | null
 
-    return NextResponse.json({ messages }, { status: 200 })
+      return {
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        metadata: metadata
+          ? {
+              confidence: metadata.confidence,
+              sources: normalizeStoredSources(metadata.sources),
+            }
+          : null,
+        createdAt: m.createdAt.toISOString(),
+      }
+    })
+
+    return NextResponse.json(
+      { messages },
+      { status: 200, headers: CACHE.noStore }
+    )
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Request failed"
     return NextResponse.json({ error: message }, { status: 401 })

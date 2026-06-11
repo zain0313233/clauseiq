@@ -8,8 +8,71 @@ import {
   type PortfolioDocument,
   type PortfolioFilter,
 } from '@/lib/document-filters'
+import type { Prisma } from '@prisma/client'
 
 type DocumentListStatus = 'all' | 'ready' | 'processing' | 'failed'
+
+const documentListInclude = {
+  analysis: true,
+} satisfies Prisma.DocumentInclude
+
+function buildStatusWhere(
+  status: DocumentListStatus
+): Prisma.DocumentWhereInput | undefined {
+  if (status === 'ready') return { status: 'ready' }
+  if (status === 'failed') return { status: 'failed' }
+  if (status === 'processing') return { status: { in: ['processing', 'pending'] } }
+  return undefined
+}
+
+function buildPortfolioSqlWhere(
+  portfolio: PortfolioFilter
+): Prisma.DocumentWhereInput | undefined {
+  if (portfolio === 'high_risk') {
+    return {
+      analysis: {
+        is: {
+          status: 'ready',
+          OR: [
+            { riskLevel: 'high' },
+            { highRiskCount: { gt: 0 } },
+            { riskScore: { gte: 70 } },
+          ],
+        },
+      },
+    }
+  }
+  return undefined
+}
+
+function needsMemoryPortfolioFilter(portfolio: PortfolioFilter): boolean {
+  return portfolio === 'expiring' || portfolio === 'unlimited_liability'
+}
+
+function buildBaseWhere(
+  userId: string,
+  search: string,
+  status: DocumentListStatus,
+  portfolio: PortfolioFilter
+): Prisma.DocumentWhereInput {
+  const where: Prisma.DocumentWhereInput = { userId }
+
+  const statusWhere = buildStatusWhere(status)
+  if (statusWhere) Object.assign(where, statusWhere)
+
+  const portfolioWhere = buildPortfolioSqlWhere(portfolio)
+  if (portfolioWhere) Object.assign(where, portfolioWhere)
+
+  const q = search.trim()
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: 'insensitive' } },
+      { fileName: { contains: q, mode: 'insensitive' } },
+    ]
+  }
+
+  return where
+}
 
 export const documentRepository = {
   create: async (data: {
@@ -32,20 +95,40 @@ export const documentRepository = {
   },
 
   getSummaryByUserId: async (userId: string) => {
-    const documents = await prisma.document.findMany({
-      where: { userId },
-      include: { analysis: true },
-    })
+    const [total, ready, processing, failed, portfolioRows] = await Promise.all([
+      prisma.document.count({ where: { userId } }),
+      prisma.document.count({ where: { userId, status: 'ready' } }),
+      prisma.document.count({
+        where: { userId, status: { in: ['processing', 'pending'] } },
+      }),
+      prisma.document.count({ where: { userId, status: 'failed' } }),
+      prisma.document.findMany({
+        where: { userId },
+        select: {
+          expirationDate: true,
+          unlimitedLiability: true,
+          analysis: {
+            select: {
+              status: true,
+              riskLevel: true,
+              riskScore: true,
+              highRiskCount: true,
+              summary: true,
+              timeline: true,
+              risks: true,
+            },
+          },
+        },
+      }),
+    ])
 
-    const portfolioDocs = documents as PortfolioDocument[]
+    const portfolioDocs = portfolioRows as PortfolioDocument[]
 
     return {
-      total: documents.length,
-      ready: documents.filter((d) => d.status === 'ready').length,
-      processing: documents.filter(
-        (d) => d.status === 'processing' || d.status === 'pending'
-      ).length,
-      failed: documents.filter((d) => d.status === 'failed').length,
+      total,
+      ready,
+      processing,
+      failed,
       portfolio: {
         expiring: portfolioDocs.filter((d) => isExpiringWithinDays(d)).length,
         highRisk: portfolioDocs.filter((d) => isHighRisk(d)).length,
@@ -67,44 +150,38 @@ export const documentRepository = {
     const { page, limit, search = '', status = 'all', portfolio = 'all' } =
       options
 
-    const where: {
-      userId: string
-      status?: string | { in: string[] }
-      OR?: Array<
-        | { title: { contains: string; mode: 'insensitive' } }
-        | { fileName: { contains: string; mode: 'insensitive' } }
-      >
-    } = { userId }
+    const where = buildBaseWhere(userId, search, status, portfolio)
 
-    if (status === 'ready') where.status = 'ready'
-    else if (status === 'failed') where.status = 'failed'
-    else if (status === 'processing') {
-      where.status = { in: ['processing', 'pending'] }
+    if (needsMemoryPortfolioFilter(portfolio)) {
+      const rows = await prisma.document.findMany({
+        where: buildBaseWhere(userId, search, status, 'all'),
+        include: documentListInclude,
+        orderBy: { createdAt: 'desc' },
+      })
+
+      const portfolioDocs = rows as PortfolioDocument[]
+      const filtered = portfolioDocs.filter((doc) =>
+        matchesPortfolioFilter(doc, portfolio)
+      )
+
+      const pagination = buildPagination(filtered.length, page, limit)
+      const start = (pagination.page - 1) * limit
+      const documents = filtered.slice(start, start + limit)
+
+      return { documents, ...pagination }
     }
 
-    const q = search.trim()
-    if (q) {
-      where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { fileName: { contains: q, mode: 'insensitive' } },
-      ]
-    }
+    const total = await prisma.document.count({ where })
+    const pagination = buildPagination(total, page, limit)
+    const skip = (pagination.page - 1) * limit
 
-    const rows = await prisma.document.findMany({
+    const documents = await prisma.document.findMany({
       where,
-      include: { analysis: true, agentReport: true },
+      include: documentListInclude,
       orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
     })
-
-    const portfolioDocs = rows as PortfolioDocument[]
-    const filtered =
-      portfolio === 'all'
-        ? portfolioDocs
-        : portfolioDocs.filter((doc) => matchesPortfolioFilter(doc, portfolio))
-
-    const pagination = buildPagination(filtered.length, page, limit)
-    const start = (pagination.page - 1) * limit
-    const documents = filtered.slice(start, start + limit)
 
     return { documents, ...pagination }
   },

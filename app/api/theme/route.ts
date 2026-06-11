@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyToken } from "@/lib/auth"
+import { hasPermission } from "@/lib/rbac"
 import { themeRepository } from "@/repositories/theme.repository"
+import { userRepository } from "@/repositories/user.repository"
 import { themeSchema } from "@/validators/theme.schema"
+import { CACHE } from "@/lib/cache-headers"
 import { normalizeTheme } from "@/lib/theme"
 
 export async function GET() {
   try {
     await themeRepository.ensureDefault()
     const theme = await themeRepository.get()
-    return NextResponse.json({ theme }, { status: 200 })
+    return NextResponse.json({ theme }, { status: 200, headers: CACHE.publicTheme })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load theme"
     return NextResponse.json({ error: message }, { status: 500 })
@@ -18,6 +21,13 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const { userId } = verifyToken(req)
+
+    const user = await userRepository.findById(userId)
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (!hasPermission(user.role, 'theme:write')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const input = themeSchema.parse(body)
     const theme = normalizeTheme(input)

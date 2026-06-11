@@ -44,6 +44,9 @@ model Document {
   analysis      DocumentAnalysis?
   agentReport   AgentReport?
   comparisons   DocumentComparison[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
 }
 
 model AgentReport {
@@ -86,6 +89,8 @@ model Chunk {
   createdAt   DateTime @default(now())
 
   document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
 }
 
 model Conversation {
@@ -97,6 +102,9 @@ model Conversation {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   messages   Message[]
+
+  @@unique([userId, documentId])
+  @@index([userId])
 }
 
 model Message {
@@ -108,6 +116,8 @@ model Message {
   createdAt      DateTime @default(now())
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 model StandardTemplate {
@@ -124,6 +134,8 @@ model StandardTemplate {
 
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   comparisons  DocumentComparison[]
+
+  @@index([userId])
 }
 
 model DocumentComparison {

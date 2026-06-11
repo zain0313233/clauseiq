@@ -1,7 +1,15 @@
 import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
 
-const JWT_SECRET = process.env.JWT_SECRET!
+function requireJwtSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required')
+  }
+  return secret
+}
+
+const JWT_SECRET = requireJwtSecret()
 
 export interface JwtPayload {
   userId: string
@@ -14,6 +22,6 @@ export function verifyToken(req: NextRequest): JwtPayload {
   }
 
   const token = authHeader.split(' ')[1]
-  const payload = jwt.verify(token, JWT_SECRET) as JwtPayload
+  const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as JwtPayload
   return payload
 }

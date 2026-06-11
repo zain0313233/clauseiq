@@ -3,7 +3,7 @@ import { verifyToken } from '@/lib/auth'
 import { documentRepository } from '@/repositories/document.repository'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
-import { supabaseAdmin } from '@/lib/supabase/client'
+import { removeStorageObject } from '@/lib/storage'
 
 export async function GET(
   req: NextRequest,
@@ -52,9 +52,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Delete from Supabase Storage
-    const filePath = document.fileUrl.split('/documents/')[1]
-    await supabaseAdmin.storage.from('documents').remove([filePath])
+    await removeStorageObject(document.fileUrl)
 
     // Delete from DB (cascades to chunks)
     await documentRepository.delete(id)

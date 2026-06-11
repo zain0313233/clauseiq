@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto'
+import { createSignedFileUrl } from '@/lib/storage'
 import type {
   ClauseMindPortfolioResponse,
   ClauseMindQueryResponse,
@@ -5,6 +7,23 @@ import type {
 } from '@/lib/clausemind'
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000'
+
+function engineHeaders(): HeadersInit {
+  const secret = process.env.ENGINE_API_SECRET
+  if (!secret) {
+    throw new Error('ENGINE_API_SECRET is required')
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${secret}`,
+    'x-request-id': randomUUID(),
+  }
+}
+
+async function signedUrl(fileUrlOrPath: string): Promise<string> {
+  return createSignedFileUrl(fileUrlOrPath)
+}
 
 export const aiService = {
   processDocument: async (data: {
@@ -15,8 +34,11 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/process/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      headers: engineHeaders(),
+      body: JSON.stringify({
+        ...data,
+        file_url: await signedUrl(data.file_url),
+      }),
     })
 
     if (!response.ok) throw new Error('Failed to process document')
@@ -31,7 +53,7 @@ export const aiService = {
   }): Promise<ClauseMindQueryResponse> => {
     const response = await fetch(`${AI_ENGINE_URL}/query/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
         question: data.question,
@@ -53,7 +75,7 @@ export const aiService = {
   }): Promise<ClauseMindPortfolioResponse> => {
     const response = await fetch(`${AI_ENGINE_URL}/portfolio/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify(data),
     })
 
@@ -95,8 +117,12 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/compare/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      headers: engineHeaders(),
+      body: JSON.stringify({
+        ...data,
+        document_file_url: await signedUrl(data.document_file_url),
+        template_file_url: await signedUrl(data.template_file_url),
+      }),
     })
 
     if (!response.ok) throw new Error('Failed to trigger comparison')
@@ -110,10 +136,10 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/agents/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
-        file_url: data.file_url,
+        file_url: await signedUrl(data.file_url),
         file_type: data.file_type,
       }),
     })
@@ -129,10 +155,10 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/analyze/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
-        file_url: data.file_url,
+        file_url: await signedUrl(data.file_url),
         file_type: data.file_type,
       }),
     })

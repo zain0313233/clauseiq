@@ -11,13 +11,12 @@ export const conversationRepository = {
   },
 
   getOrCreate: async (userId: string, documentId: string) => {
-    const existing = await prisma.conversation.findFirst({
-      where: { userId, documentId },
-    })
-    if (existing) return existing
-
-    return prisma.conversation.create({
-      data: { userId, documentId },
+    return prisma.conversation.upsert({
+      where: {
+        userId_documentId: { userId, documentId },
+      },
+      create: { userId, documentId },
+      update: {},
     })
   },
 }
