@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import {
   FileText,
   Loader2,
@@ -14,10 +14,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 import { cn } from "@/lib/utils"
-import { TEMPLATE_TYPES, type StandardTemplate } from "@/types/comparison"
+import {
+  useDeleteTemplateMutation,
+  useTemplatesQuery,
+  useUploadTemplateMutation,
+} from "@/hooks/use-templates-query"
+import { TEMPLATE_TYPES } from "@/types/comparison"
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -30,28 +34,15 @@ function typeLabel(value: string) {
 }
 
 export function StandardsPanel() {
-  const [templates, setTemplates] = useState<StandardTemplate[]>([])
-  const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
+  const { data: templates = [], isLoading: loading } = useTemplatesQuery()
+  const uploadMutation = useUploadTemplateMutation()
+  const deleteMutation = useDeleteTemplateMutation()
   const [name, setName] = useState("")
   const [type, setType] = useState("nda")
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const fetchTemplates = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/templates", { headers: authHeaders() })
-      const data = await res.json()
-      if (res.ok) setTemplates(data.templates || [])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
+  const uploading = uploadMutation.isPending
 
   async function uploadFile(file: File) {
     if (!name.trim()) {
@@ -59,41 +50,24 @@ export function StandardsPanel() {
       return
     }
 
-    setUploading(true)
     try {
       const formData = new FormData()
       formData.append("file", file)
       formData.append("name", name.trim())
       formData.append("type", type)
 
-      const res = await fetch("/api/templates", {
-        method: "POST",
-        headers: authHeaders(),
-        body: formData,
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-
+      await uploadMutation.mutateAsync(formData)
       toast.success("Gold standard template uploaded")
       setName("")
-      await fetchTemplates()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
-    } finally {
-      setUploading(false)
     }
   }
 
   async function handleDelete(id: string) {
     try {
-      const res = await fetch(`/api/templates/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      await deleteMutation.mutateAsync(id)
       toast.success("Template deleted")
-      setTemplates((prev) => prev.filter((t) => t.id !== id))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed")
     }

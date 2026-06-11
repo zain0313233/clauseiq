@@ -2,6 +2,7 @@
 
 import { AuthProvider } from "@/contexts/auth-provider"
 import { ThemeProvider } from "@/contexts/theme-provider"
+import { QueryProvider } from "@/components/providers/query-provider"
 import type { SiteThemeConfig } from "@/lib/theme"
 
 export function AppProviders({
@@ -12,8 +13,10 @@ export function AppProviders({
   initialTheme: SiteThemeConfig
 }) {
   return (
-    <ThemeProvider initialTheme={initialTheme}>
-      <AuthProvider>{children}</AuthProvider>
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider initialTheme={initialTheme}>
+        <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
+    </QueryProvider>
   )
 }

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import {
   Bar,
   BarChart,
@@ -14,33 +13,15 @@ import {
 } from "recharts"
 import { BarChart3, Loader2, PieChart as PieChartIcon } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { authHeaders } from "@/lib/auth-client"
-
-type WeeklyPoint = { day: string; uploads: number; queries: number }
-type TypePoint = { name: string; value: number; count: number; color: string }
+import { useChartsQuery } from "@/hooks/use-charts-query"
 
 export function DashboardCharts() {
-  const [weeklyData, setWeeklyData] = useState<WeeklyPoint[]>([])
-  const [distributionData, setDistributionData] = useState<TypePoint[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data, isLoading } = useChartsQuery()
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/dashboard/charts", { headers: authHeaders() })
-        const data = await res.json()
-        if (res.ok) {
-          setWeeklyData(data.weeklyActivity || [])
-          setDistributionData(data.typeDistribution || [])
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  const weeklyData = data?.weeklyActivity ?? []
+  const distributionData = data?.typeDistribution ?? []
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {[0, 1].map((i) => (

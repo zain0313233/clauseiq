@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import {
   MessageSquare,
@@ -30,6 +31,8 @@ import {
   useDocumentPolling,
   useSingleDocumentPolling,
 } from "@/hooks/use-document-polling"
+import { useAllDocumentsQuery } from "@/hooks/use-all-documents-query"
+import { queryKeys } from "@/lib/query-keys"
 import type { ChatDocument, ChatMessage } from "./types"
 
 const WELCOME_MESSAGE = (title: string): ChatMessage => ({
@@ -67,8 +70,12 @@ type ChatWorkspaceProps = {
 
 export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const router = useRouter()
-  const [documents, setDocuments] = useState<ChatDocument[]>([])
-  const [loadingDocs, setLoadingDocs] = useState(true)
+  const queryClient = useQueryClient()
+  const {
+    data: documents = [],
+    isLoading: loadingDocs,
+    refetch: refetchDocuments,
+  } = useAllDocumentsQuery()
   const [selectedId, setSelectedId] = useState<string | null>(
     initialDocumentId ?? null
   )
@@ -100,22 +107,9 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     }
   }, [])
 
-  const fetchDocuments = useCallback(async () => {
-    setLoadingDocs(true)
-    try {
-      const res = await fetch("/api/documents", { headers: authHeaders() })
-      const data = await res.json()
-      if (res.ok) setDocuments(data.documents || [])
-    } finally {
-      setLoadingDocs(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchDocuments()
-  }, [fetchDocuments])
-
-  useDocumentPolling(documents, fetchDocuments)
+  useDocumentPolling(documents, () => {
+    void refetchDocuments()
+  })
 
   useEffect(() => {
     if (initialDocumentId) setSelectedId(initialDocumentId)
@@ -170,11 +164,20 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     [documents, selectedId]
   )
 
-  const handleStatusChange = useCallback((status: string) => {
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === selectedId ? { ...d, status } : d))
-    )
-  }, [selectedId])
+  const handleStatusChange = useCallback(
+    (status: string) => {
+      if (!selectedId) return
+      queryClient.setQueryData<{ documents: ChatDocument[] }>(
+        queryKeys.documents.all(),
+        (prev) => ({
+          documents: (prev?.documents ?? []).map((d) =>
+            d.id === selectedId ? { ...d, status } : d
+          ),
+        })
+      )
+    },
+    [selectedId, queryClient]
+  )
 
   useSingleDocumentPolling(
     selectedId,
@@ -341,7 +344,7 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
             selectedId={selectedId}
             loading={loadingDocs}
             onSelect={selectDocument}
-            onRefresh={fetchDocuments}
+            onRefresh={() => void refetchDocuments()}
             lastPreview={lastPreview}
             width={inboxWidth}
           />

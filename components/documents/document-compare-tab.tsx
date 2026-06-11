@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useTemplatesQuery } from "@/hooks/use-templates-query"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -21,7 +22,6 @@ import {
   type ClauseDeviation,
   type ComparisonSummary,
   type DocumentComparison,
-  type StandardTemplate,
 } from "@/types/comparison"
 
 const flagStyles: Record<string, string> = {
@@ -51,26 +51,16 @@ export function DocumentCompareTab({
   documentId,
   documentReady,
 }: DocumentCompareTabProps) {
-  const [templates, setTemplates] = useState<StandardTemplate[]>([])
+  const { data: templates = [], isLoading: loadingTemplates } = useTemplatesQuery()
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [comparison, setComparison] = useState<DocumentComparison | null>(null)
-  const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [comparing, setComparing] = useState(false)
 
-  const fetchTemplates = useCallback(async () => {
-    setLoadingTemplates(true)
-    try {
-      const res = await fetch("/api/templates", { headers: authHeaders() })
-      const data = await res.json()
-      if (res.ok) {
-        const list = data.templates || []
-        setTemplates(list)
-        setSelectedTemplateId((prev) => prev || list[0]?.id || "")
-      }
-    } finally {
-      setLoadingTemplates(false)
+  useEffect(() => {
+    if (templates.length > 0 && !selectedTemplateId) {
+      setSelectedTemplateId(templates[0].id)
     }
-  }, [])
+  }, [templates, selectedTemplateId])
 
   const fetchComparison = useCallback(async (templateId: string) => {
     if (!templateId) return
@@ -86,10 +76,6 @@ export function DocumentCompareTab({
       setComparison(null)
     }
   }, [documentId])
-
-  useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
 
   useEffect(() => {
     if (selectedTemplateId) fetchComparison(selectedTemplateId)

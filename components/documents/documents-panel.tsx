@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   FileText,
@@ -16,24 +16,27 @@ import {
   AlertCircle,
   Shield,
 } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
+import { invalidateDocuments } from "@/hooks/query-utils"
 import { toast } from "sonner"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { authHeaders } from "@/lib/auth-client"
 import { useDocumentPolling } from "@/hooks/use-document-polling"
+import { useDocumentsQuery } from "@/hooks/use-documents-query"
 import { cn } from "@/lib/utils"
 import {
   contractTypeLabel,
   getExpirationDate,
   isExpiringWithinDays,
-  isHighRisk,
   hasUnlimitedLiability,
-  matchesPortfolioFilter,
   type PortfolioDocument,
   type PortfolioFilter,
 } from "@/lib/document-filters"
+import type { DocumentListStatus } from "@/lib/query-keys"
 
 type Document = PortfolioDocument & {
   fileName: string
@@ -42,7 +45,7 @@ type Document = PortfolioDocument & {
   createdAt: string
 }
 
-type FilterTab = "all" | "ready" | "processing" | "failed"
+type FilterTab = DocumentListStatus
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -91,24 +94,43 @@ function statusConfig(status: string) {
 }
 
 export function DocumentsPanel() {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [deleting, setDeleting] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
   const [portfolioFilter, setPortfolioFilter] = useState<PortfolioFilter>("all")
+  const [page, setPage] = useState(1)
 
-  async function fetchDocuments() {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/documents", { headers: authHeaders() })
-      const data = await res.json()
-      if (res.ok) setDocuments(data.documents || [])
-    } catch {
-      toast.error("Failed to load documents")
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(id)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, filter, portfolioFilter])
+
+  const { data, isLoading, isFetching, isError, refetch } = useDocumentsQuery({
+    page,
+    search: debouncedSearch,
+    status: filter,
+    portfolio: portfolioFilter,
+  })
+
+  const documents = (data?.documents ?? []) as Document[]
+  const pagination = data?.pagination ?? {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  }
+  const summary = data?.summary ?? {
+    total: 0,
+    ready: 0,
+    processing: 0,
+    failed: 0,
+    portfolio: { expiring: 0, highRisk: 0, unlimited: 0 },
   }
 
   async function handleDelete(id: string) {
@@ -120,11 +142,11 @@ export function DocumentsPanel() {
         headers: authHeaders(),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error)
+        const body = await res.json()
+        throw new Error(body.error)
       }
       toast.success("Document deleted")
-      setDocuments((prev) => prev.filter((d) => d.id !== id))
+      await invalidateDocuments(queryClient)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed")
     } finally {
@@ -132,52 +154,9 @@ export function DocumentsPanel() {
     }
   }
 
-  useEffect(() => {
-    fetchDocuments()
-  }, [])
-
-  useDocumentPolling(documents, fetchDocuments)
-
-  const stats = useMemo(
-    () => ({
-      total: documents.length,
-      ready: documents.filter((d) => d.status === "ready").length,
-      processing: documents.filter(
-        (d) => d.status === "processing" || d.status === "pending"
-      ).length,
-      failed: documents.filter((d) => d.status === "failed").length,
-    }),
-    [documents]
-  )
-
-  const filtered = useMemo(() => {
-    return documents.filter((doc) => {
-      const matchesSearch =
-        !search.trim() ||
-        doc.title.toLowerCase().includes(search.toLowerCase()) ||
-        doc.fileName.toLowerCase().includes(search.toLowerCase())
-
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "ready" && doc.status === "ready") ||
-        (filter === "processing" &&
-          (doc.status === "processing" || doc.status === "pending")) ||
-        (filter === "failed" && doc.status === "failed")
-
-      const matchesPortfolio = matchesPortfolioFilter(doc, portfolioFilter)
-
-      return matchesSearch && matchesFilter && matchesPortfolio
-    })
-  }, [documents, search, filter, portfolioFilter])
-
-  const portfolioCounts = useMemo(
-    () => ({
-      expiring: documents.filter((d) => isExpiringWithinDays(d)).length,
-      highRisk: documents.filter((d) => isHighRisk(d)).length,
-      unlimited: documents.filter((d) => hasUnlimitedLiability(d)).length,
-    }),
-    [documents]
-  )
+  useDocumentPolling(documents, () => {
+    void refetch()
+  })
 
   const portfolioTabs: {
     key: PortfolioFilter
@@ -185,25 +164,35 @@ export function DocumentsPanel() {
     count?: number
   }[] = [
     { key: "all", label: "All contracts" },
-    { key: "expiring", label: "Expiring ≤60d", count: portfolioCounts.expiring },
-    { key: "high_risk", label: "High risk", count: portfolioCounts.highRisk },
+    {
+      key: "expiring",
+      label: "Expiring ≤60d",
+      count: summary.portfolio.expiring,
+    },
+    {
+      key: "high_risk",
+      label: "High risk",
+      count: summary.portfolio.highRisk,
+    },
     {
       key: "unlimited_liability",
       label: "Unlimited liability",
-      count: portfolioCounts.unlimited,
+      count: summary.portfolio.unlimited,
     },
   ]
 
   const filterTabs: { key: FilterTab; label: string; count: number }[] = [
-    { key: "all", label: "All", count: stats.total },
-    { key: "ready", label: "Ready", count: stats.ready },
-    { key: "processing", label: "Processing", count: stats.processing },
-    { key: "failed", label: "Failed", count: stats.failed },
+    { key: "all", label: "All", count: summary.total },
+    { key: "ready", label: "Ready", count: summary.ready },
+    { key: "processing", label: "Processing", count: summary.processing },
+    { key: "failed", label: "Failed", count: summary.failed },
   ]
+
+  const loading = isLoading
+  const refreshing = isFetching && !isLoading
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold leading-tight tracking-tight text-foreground">
@@ -218,10 +207,10 @@ export function DocumentsPanel() {
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={fetchDocuments}
-            disabled={loading}
+            onClick={() => refetch()}
+            disabled={refreshing}
           >
-            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
             Refresh
           </Button>
           <Link
@@ -234,13 +223,12 @@ export function DocumentsPanel() {
         </div>
       </div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Total", value: stats.total, color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "Ready", value: stats.ready, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Processing", value: stats.processing, color: "text-amber-400", bg: "bg-amber-500/10" },
-          { label: "Failed", value: stats.failed, color: "text-red-400", bg: "bg-red-500/10" },
+          { label: "Total", value: summary.total, color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Ready", value: summary.ready, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "Processing", value: summary.processing, color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "Failed", value: summary.failed, color: "text-red-400", bg: "bg-red-500/10" },
         ].map((s) => (
           <Card key={s.label} className="border-border/60 bg-card/40">
             <CardContent className="flex items-center gap-3 p-4">
@@ -255,7 +243,6 @@ export function DocumentsPanel() {
         ))}
       </div>
 
-      {/* Toolbar */}
       <Card className="border-border/60 bg-card/40">
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-xs">
@@ -322,7 +309,6 @@ export function DocumentsPanel() {
         </CardContent>
       </Card>
 
-      {/* Document list */}
       <Card className="border-border/60 bg-card/40 overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
@@ -330,9 +316,24 @@ export function DocumentsPanel() {
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="text-xs text-muted-foreground">Loading documents…</p>
             </div>
-          ) : documents.length === 0 ? (
+          ) : isError ? (
+            <div className="flex flex-col items-center py-16 text-center">
+              <AlertCircle className="mb-3 h-10 w-10 text-destructive/70" />
+              <p className="text-sm font-medium text-foreground">
+                Could not load documents
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 text-xs"
+                onClick={() => refetch()}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : summary.total === 0 ? (
             <EmptyState />
-          ) : filtered.length === 0 ? (
+          ) : documents.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-center">
               <Search className="mb-3 h-10 w-10 text-muted-foreground/50" />
               <p className="text-sm font-medium text-foreground">No matches found</p>
@@ -354,7 +355,7 @@ export function DocumentsPanel() {
             </div>
           ) : (
             <div className="divide-y divide-border/60">
-              {filtered.map((doc) => (
+              {documents.map((doc) => (
                 <DocumentRow
                   key={doc.id}
                   doc={doc}
@@ -367,11 +368,12 @@ export function DocumentsPanel() {
         </CardContent>
       </Card>
 
-      {!loading && filtered.length > 0 && (
-        <p className="text-center text-[11px] text-muted-foreground">
-          Showing {filtered.length} of {documents.length} document
-          {documents.length !== 1 ? "s" : ""}
-        </p>
+      {!loading && documents.length > 0 && (
+        <PaginationControls
+          pagination={pagination}
+          onPageChange={setPage}
+          itemLabel="documents"
+        />
       )}
     </div>
   )

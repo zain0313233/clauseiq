@@ -8,7 +8,8 @@ export async function POST(req: NextRequest) {
     const input = loginSchema.parse(body)
     const result = await userService.login(input)
     return NextResponse.json(result, { status: 200 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Request failed'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

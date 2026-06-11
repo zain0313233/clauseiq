@@ -7,9 +7,17 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
+function shouldSkipRateLimit(): boolean {
+  return (
+    process.env.PLAYWRIGHT_TEST === '1' ||
+    process.env.NODE_ENV === 'test'
+  )
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1'
+  const skipRateLimit = shouldSkipRateLimit()
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -17,7 +25,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // Apply rate limiting to auth routes
-  if (pathname.startsWith('/api/auth')) {
+  if (
+    !skipRateLimit &&
+    (pathname === '/api/login' || pathname === '/api/signup')
+  ) {
     const { success } = await authRateLimiter.limit(ip)
     if (!success) {
       return NextResponse.json(
@@ -28,7 +39,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Apply rate limiting to all other API routes
-  if (pathname.startsWith('/api')) {
+  if (!skipRateLimit && pathname.startsWith('/api')) {
     const { success } = await rateLimiter.limit(ip)
     if (!success) {
       return NextResponse.json(

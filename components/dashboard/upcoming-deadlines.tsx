@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Calendar, Clock, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
+import { PaginationControls } from "@/components/ui/pagination-controls"
+import { useDeadlinesQuery } from "@/hooks/use-deadlines-query"
 import { cn } from "@/lib/utils"
-import type { TimelineEvent } from "@/types/analysis"
 
 const typeStyles: Record<string, string> = {
   expiration: "border-red-500/30 text-red-400",
@@ -20,23 +20,16 @@ const typeStyles: Record<string, string> = {
 }
 
 export function UpcomingDeadlines() {
-  const [deadlines, setDeadlines] = useState<TimelineEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const { data, isLoading, isError, refetch } = useDeadlinesQuery(page)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/dashboard/deadlines", {
-          headers: authHeaders(),
-        })
-        const data = await res.json()
-        if (res.ok) setDeadlines(data.deadlines || [])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  const deadlines = data?.deadlines ?? []
+  const pagination = data?.pagination ?? {
+    page: 1,
+    limit: 5,
+    total: 0,
+    totalPages: 1,
+  }
 
   return (
     <Card className="border-border/50 bg-card/50">
@@ -52,9 +45,22 @@ export function UpcomingDeadlines() {
         </p>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Could not load upcoming dates.
+            </p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-2 text-xs font-medium text-primary hover:underline"
+            >
+              Try again
+            </button>
           </div>
         ) : deadlines.length === 0 ? (
           <div className="flex flex-col items-center py-8 text-center">
@@ -64,45 +70,52 @@ export function UpcomingDeadlines() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {deadlines.map((item, i) => (
-              <div
-                key={`${item.documentId}-${item.label}-${i}`}
-                className="flex items-start justify-between gap-3 rounded-lg border border-border/40 bg-background/30 p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium">{item.label}</p>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] capitalize",
-                        typeStyles[item.type] ?? typeStyles.other
-                      )}
-                    >
-                      {item.type}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {item.date}
-                    {item.party ? ` · ${item.party}` : ""}
-                  </p>
-                  {item.description && (
-                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                      {item.description}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              {deadlines.map((item, i) => (
+                <div
+                  key={`${item.documentId}-${item.label}-${i}`}
+                  className="flex items-start justify-between gap-3 rounded-lg border border-border/40 bg-background/30 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{item.label}</p>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] capitalize",
+                          typeStyles[item.type] ?? typeStyles.other
+                        )}
+                      >
+                        {item.type}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {item.date}
+                      {item.party ? ` · ${item.party}` : ""}
                     </p>
-                  )}
-                  {item.documentTitle && item.documentId && (
-                    <Link
-                      href={`/dashboard/documents/${item.documentId}`}
-                      className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
-                    >
-                      {item.documentTitle}
-                    </Link>
-                  )}
+                    {item.description && (
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                        {item.description}
+                      </p>
+                    )}
+                    {item.documentTitle && item.documentId && (
+                      <Link
+                        href={`/dashboard/documents/${item.documentId}`}
+                        className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
+                      >
+                        {item.documentTitle}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <PaginationControls
+              pagination={pagination}
+              onPageChange={setPage}
+              itemLabel="dates"
+            />
           </div>
         )}
       </CardContent>

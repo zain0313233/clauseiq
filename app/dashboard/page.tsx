@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
-import { RefreshCw, FileText } from "lucide-react"
+import { RefreshCw, FileText, Loader2 } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,9 +11,15 @@ import { DashboardCharts } from "@/components/dashboard/dashboard-charts"
 import { QuickActions } from "@/components/dashboard/quick-actions"
 import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines"
 import { PortfolioSearch } from "@/components/dashboard/portfolio-search"
-import { authHeaders } from "@/lib/auth-client"
+import {
+  RECENT_DOCUMENTS_LIMIT,
+  useDocumentsQuery,
+} from "@/hooks/use-documents-query"
+import { invalidateDashboard } from "@/hooks/query-utils"
+import { useStatsQuery } from "@/hooks/use-stats-query"
+import { cn } from "@/lib/utils"
 
-type Document = {
+type RecentDocument = {
   id: string
   title: string
   status: string
@@ -22,41 +28,33 @@ type Document = {
   analysis?: { riskScore: number | null; riskLevel: string | null; status: string } | null
 }
 
-type Stats = {
-  total: number
-  ready: number
-  queries: number
-  risky: number
-}
-
 export default function DashboardPage() {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [stats, setStats] = useState<Stats>({ total: 0, ready: 0, queries: 0, risky: 0 })
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  async function fetchData() {
-    setLoading(true)
-    try {
-      const [docsRes, statsRes] = await Promise.all([
-        fetch("/api/documents", { headers: authHeaders() }),
-        fetch("/api/dashboard/stats", { headers: authHeaders() }),
-      ])
+  const {
+    data: stats = { total: 0, ready: 0, queries: 0, risky: 0 },
+    isLoading: statsLoading,
+  } = useStatsQuery()
 
-      const docsData = await docsRes.json()
-      const statsData = await statsRes.json()
+  const {
+    data: docsData,
+    isLoading: docsLoading,
+    isFetching: docsFetching,
+  } = useDocumentsQuery({
+    page: 1,
+    limit: RECENT_DOCUMENTS_LIMIT,
+    search: "",
+    status: "all",
+    portfolio: "all",
+  })
 
-      if (docsRes.ok) setDocuments(docsData.documents || [])
-      if (statsRes.ok) setStats(statsData.stats)
-    } catch {
-      setDocuments([])
-    } finally {
-      setLoading(false)
-    }
+  const documents = (docsData?.documents ?? []) as RecentDocument[]
+  const loading = statsLoading || docsLoading
+  const refreshing = docsFetching && !docsLoading
+
+  async function handleRefresh() {
+    await invalidateDashboard(queryClient)
   }
-
-  useEffect(() => {
-    fetchData()
-  }, [])
 
   return (
     <div className="space-y-6">
@@ -74,9 +72,12 @@ export default function DashboardPage() {
             variant="secondary"
             size="sm"
             className="w-fit bg-white/15 text-sm font-medium text-white hover:bg-white/25"
-            onClick={fetchData}
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
           >
-            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+            <RefreshCw
+              className={cn("mr-2 h-3.5 w-3.5", refreshing && "animate-spin")}
+            />
             Refresh
           </Button>
         </CardContent>
@@ -103,9 +104,9 @@ export default function DashboardPage() {
           </div>
 
           {loading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Loading documents...
-            </p>
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
           ) : documents.length === 0 ? (
             <div className="flex flex-col items-center py-10 text-center">
               <FileText className="mb-3 h-10 w-10 text-muted-foreground" />
@@ -121,7 +122,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {documents.slice(0, 5).map((doc) => (
+              {documents.map((doc) => (
                 <div
                   key={doc.id}
                   className="flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-muted/50"

@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
+import { invalidateDashboard } from "@/hooks/query-utils"
 import Link from "next/link"
 import {
   Upload,
@@ -57,6 +59,7 @@ function fileTypeLabel(file: File) {
 
 export function UploadPanel() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [title, setTitle] = useState("")
   const [file, setFile] = useState<File | null>(null)
@@ -107,6 +110,7 @@ export function UploadPanel() {
       if (!res.ok) throw new Error(data.error)
 
       toast.success("Document uploaded! Processing started.")
+      await invalidateDashboard(queryClient)
       router.push("/dashboard/documents")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
