@@ -1,5 +1,5 @@
 [build]
-# Install step is overridden in railpack.json (npm install, not npm ci).
+# Set Railway variable RAILPACK_INSTALL_CMD=npm install (fixes Linux lockfile vs npm ci).
 buildCommand = "npx prisma generate && npm run build"
 
 [deploy]
