@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Loader2,
   X,
+  ArrowLeft,
   FileText,
   Sparkles,
   AlertCircle,
@@ -15,6 +16,7 @@ import {
   FileSearch,
   Languages,
 } from "lucide-react"
+import { useSidebar } from "@/components/layout/sidebar-context"
 import { Button } from "@/components/ui/button"
 import { ChatInbox } from "./chat-inbox"
 import { ChatMessageBubble } from "./chat-message"
@@ -70,6 +72,7 @@ type ChatWorkspaceProps = {
 export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { isMobile } = useSidebar()
   const {
     data: documents = [],
     isLoading: loadingDocs,
@@ -84,12 +87,29 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const [loading, setLoading] = useState(false)
   const [plainEnglish, setPlainEnglish] = useState(false)
   const [inboxWidth, setInboxWidth] = useState(320)
+  const [inboxCollapsed, setInboxCollapsed] = useState(false)
+  const [inboxHydrated, setInboxHydrated] = useState(false)
   const resizingInbox = useRef(false)
   const splitRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const stored = localStorage.getItem("clauseiq-inbox-collapsed")
+    if (stored === "true") setInboxCollapsed(true)
+    setInboxHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!inboxHydrated) return
+    localStorage.setItem("clauseiq-inbox-collapsed", String(inboxCollapsed))
+  }, [inboxCollapsed, inboxHydrated])
+
+  const toggleInbox = useCallback(() => {
+    setInboxCollapsed((prev) => !prev)
+  }, [])
+
+  useEffect(() => {
     function onMove(e: MouseEvent) {
-      if (!resizingInbox.current || !splitRef.current) return
+      if (!resizingInbox.current || !splitRef.current || inboxCollapsed) return
       const left = splitRef.current.getBoundingClientRect().left
       setInboxWidth(Math.min(520, Math.max(220, e.clientX - left)))
     }
@@ -104,7 +124,7 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
-  }, [])
+  }, [inboxCollapsed])
 
   const hasProcessing = documents.some(
     (d) => d.status === "processing" || d.status === "pending"
@@ -328,7 +348,12 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-border/60 px-6 py-4">
+      <div
+        className={cn(
+          "shrink-0 border-b border-border/60 px-4 py-4 md:px-6",
+          isMobile && selectedDoc && "hidden md:block"
+        )}
+      >
         <h1 className="text-2xl font-semibold leading-tight tracking-tight">
           Chat
         </h1>
@@ -337,44 +362,75 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
         </p>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 md:px-6 md:pb-6">
         <div
           ref={splitRef}
-          className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/60 bg-card/20 shadow-sm"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/20 shadow-sm md:flex-row"
         >
-          <ChatInbox
-            documents={documents}
-            selectedId={selectedId}
-            loading={loadingDocs}
-            onSelect={selectDocument}
-            onRefresh={() => void refetchDocuments()}
-            lastPreview={lastPreview}
-            width={inboxWidth}
-          />
+          <div
+            className={cn(
+              "flex h-full min-h-0 w-full shrink-0 flex-col md:w-auto",
+              isMobile && selectedId && "hidden md:flex"
+            )}
+          >
+            <ChatInbox
+              documents={documents}
+              selectedId={selectedId}
+              loading={loadingDocs}
+              onSelect={selectDocument}
+              onRefresh={() => void refetchDocuments()}
+              lastPreview={lastPreview}
+              width={inboxWidth}
+              collapsed={isMobile ? false : inboxCollapsed}
+              onToggleCollapse={isMobile ? undefined : toggleInbox}
+            />
+          </div>
 
-          <button
-            type="button"
-            aria-label="Resize inbox"
-            className="hidden w-1.5 shrink-0 cursor-col-resize border-0 bg-border/40 transition-colors hover:bg-primary/50 md:block"
-            onMouseDown={() => {
-              resizingInbox.current = true
-              document.body.style.cursor = "col-resize"
-              document.body.style.userSelect = "none"
-            }}
-          />
+          {!inboxCollapsed && (
+            <button
+              type="button"
+              aria-label="Resize inbox"
+              className="hidden w-1.5 shrink-0 cursor-col-resize border-0 bg-border/40 transition-colors hover:bg-primary/50 md:block"
+              onMouseDown={() => {
+                resizingInbox.current = true
+                document.body.style.cursor = "col-resize"
+                document.body.style.userSelect = "none"
+              }}
+            />
+          )}
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background/50">
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background/50",
+              isMobile && !selectedId && "hidden md:flex"
+            )}
+          >
             {!selectedDoc ? (
               <EmptyChatState />
             ) : (
               <>
                 <div className="flex shrink-0 items-center justify-between rounded-t-2xl bg-primary px-4 py-3 text-primary-foreground md:rounded-none">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {isMobile && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0 text-primary-foreground hover:bg-white/15"
+                        onClick={() => {
+                          setSelectedId(null)
+                          router.push("/chat", { scroll: false })
+                        }}
+                        aria-label="Back to inbox"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">
                       {selectedDoc.title.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold leading-tight">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold leading-tight">
                         {selectedDoc.title}
                       </p>
                       <p className="text-[11px] leading-tight text-primary-foreground/75">
@@ -386,18 +442,20 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-primary-foreground hover:bg-white/15"
-                    onClick={() => {
-                      setSelectedId(null)
-                      router.push("/chat", { scroll: false })
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {!isMobile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-primary-foreground hover:bg-white/15"
+                      onClick={() => {
+                        setSelectedId(null)
+                        router.push("/chat", { scroll: false })
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/20">

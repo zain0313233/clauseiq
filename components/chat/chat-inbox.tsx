@@ -1,11 +1,13 @@
 "use client"
 
 import type { CSSProperties } from "react"
-import { RefreshCw, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, RefreshCw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { ChatDocument } from "./types"
+
+const INBOX_COLLAPSED_WIDTH = 72
 
 type ChatInboxProps = {
   documents: ChatDocument[]
@@ -14,7 +16,9 @@ type ChatInboxProps = {
   onSelect: (id: string) => void
   onRefresh: () => void
   lastPreview: Record<string, string>
-  width?: number // desktop only — mobile stays full width
+  width?: number
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 export function ChatInbox({
@@ -25,33 +29,77 @@ export function ChatInbox({
   onRefresh,
   lastPreview,
   width,
+  collapsed = false,
+  onToggleCollapse,
 }: ChatInboxProps) {
   const readyDocs = documents.filter((d) => d.status === "ready")
   const otherDocs = documents.filter((d) => d.status !== "ready")
 
   return (
     <div
-      className="flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden border-r border-border/60 bg-card text-card-foreground md:w-[var(--inbox-width,20rem)]"
+      className={cn(
+        "flex h-full min-h-0 w-full shrink-0 flex-col overflow-hidden border-r border-border/60 bg-card text-card-foreground transition-[width] duration-300 ease-in-out md:w-[var(--inbox-width,20rem)]",
+        collapsed && "md:w-[var(--inbox-collapsed-width,4.5rem)]"
+      )}
       style={
-        width != null
-          ? ({ "--inbox-width": `${width}px` } as CSSProperties)
-          : undefined
+        {
+          "--inbox-width": collapsed ? `${INBOX_COLLAPSED_WIDTH}px` : `${width ?? 320}px`,
+          "--inbox-collapsed-width": `${INBOX_COLLAPSED_WIDTH}px`,
+        } as CSSProperties
       }
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-4 py-3">
-        <h2 className="text-sm font-semibold leading-tight tracking-tight text-foreground">
-          Inbox
-        </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 text-xs text-foreground/70 hover:text-foreground"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
-          Refresh
-        </Button>
+      <div
+        className={cn(
+          "flex shrink-0 items-center border-b border-border/60 py-3",
+          collapsed ? "justify-center px-2" : "justify-between px-4"
+        )}
+      >
+        {!collapsed && (
+          <h2 className="text-sm font-semibold leading-tight tracking-tight text-foreground">
+            Inbox
+          </h2>
+        )}
+        <div className={cn("flex items-center", collapsed ? "flex-col gap-1" : "gap-1")}>
+          {!collapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs text-foreground/70 hover:text-foreground"
+              onClick={onRefresh}
+              disabled={loading}
+            >
+              <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
+              Refresh
+            </Button>
+          )}
+          {collapsed && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-foreground/70 hover:text-foreground"
+              onClick={onRefresh}
+              disabled={loading}
+              title="Refresh"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            </Button>
+          )}
+          {onToggleCollapse && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-foreground/70 hover:text-foreground"
+              onClick={onToggleCollapse}
+              title={collapsed ? "Expand inbox" : "Collapse inbox"}
+            >
+              {collapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -60,16 +108,26 @@ export function ChatInbox({
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
         ) : documents.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-foreground/65">
-            No documents yet. Upload a contract to start chatting.
-          </p>
+          !collapsed && (
+            <p className="px-4 py-8 text-center text-xs text-foreground/65">
+              No documents yet. Upload a contract to start chatting.
+            </p>
+          )
         ) : (
-          <div className="space-y-1 p-2">
+          <div
+            className={cn(
+              collapsed
+                ? "flex flex-col items-center gap-2 py-2"
+                : "space-y-1 p-2"
+            )}
+          >
             {readyDocs.length > 0 && (
               <>
-                <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/55">
-                  Ready
-                </p>
+                {!collapsed && (
+                  <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/55">
+                    Ready
+                  </p>
+                )}
                 {readyDocs.map((doc) => (
                   <InboxItem
                     key={doc.id}
@@ -77,15 +135,18 @@ export function ChatInbox({
                     selected={selectedId === doc.id}
                     preview={lastPreview[doc.id]}
                     onSelect={onSelect}
+                    collapsed={collapsed}
                   />
                 ))}
               </>
             )}
             {otherDocs.length > 0 && (
               <>
-                <p className="mt-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/55">
-                  Processing
-                </p>
+                {!collapsed && (
+                  <p className="mt-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-foreground/55">
+                    Processing
+                  </p>
+                )}
                 {otherDocs.map((doc) => (
                   <InboxItem
                     key={doc.id}
@@ -94,6 +155,7 @@ export function ChatInbox({
                     preview={lastPreview[doc.id]}
                     onSelect={onSelect}
                     disabled={doc.status !== "ready"}
+                    collapsed={collapsed}
                   />
                 ))}
               </>
@@ -111,14 +173,39 @@ function InboxItem({
   preview,
   onSelect,
   disabled,
+  collapsed,
 }: {
   doc: ChatDocument
   selected: boolean
   preview?: string
   onSelect: (id: string) => void
   disabled?: boolean
+  collapsed?: boolean
 }) {
   const initial = doc.title.charAt(0).toUpperCase()
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        title={doc.title}
+        onClick={() => onSelect(doc.id)}
+        className={cn(
+          "relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors",
+          selected
+            ? "bg-primary text-primary-foreground ring-2 ring-primary/40 ring-offset-2 ring-offset-card"
+            : "bg-primary/15 text-primary hover:bg-primary/25",
+          disabled && "cursor-not-allowed opacity-60"
+        )}
+      >
+        {initial}
+        {doc.status === "ready" && (
+          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500" />
+        )}
+      </button>
+    )
+  }
 
   return (
     <button
