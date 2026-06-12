@@ -1,5 +1,6 @@
 [build]
-buildCommand = "npm install && npx prisma generate && npm run build"
+# Install step is overridden in railpack.json (npm install, not npm ci).
+buildCommand = "npx prisma generate && npm run build"
 
 [deploy]
 startCommand = "npm run start"
