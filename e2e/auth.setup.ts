@@ -8,7 +8,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-setup("authenticate", async ({ request, page }) => {
+setup("authenticate", async ({ request }) => {
   const email = process.env.PLAYWRIGHT_TEST_EMAIL
   const password = process.env.PLAYWRIGHT_TEST_PASSWORD
 
@@ -20,8 +20,6 @@ setup("authenticate", async ({ request, page }) => {
 
   fs.mkdirSync(path.dirname(authFile), { recursive: true })
 
-  let token = ""
-  let user: unknown
   let lastError = "unknown"
 
   for (let attempt = 1; attempt <= 24; attempt++) {
@@ -32,46 +30,24 @@ setup("authenticate", async ({ request, page }) => {
     const text = await res.text()
 
     if (res.ok()) {
-      const data = JSON.parse(text) as { token: string; user: unknown }
-      token = data.token
-      user = data.user
-      break
+      const state = await request.storageState()
+      fs.writeFileSync(authFile, JSON.stringify(state, null, 2))
+      return
     }
 
     lastError = `Login failed (${res.status()}): ${text.slice(0, 400)}`
 
-    // Bad credentials — don't retry
     if (res.status() === 400 || res.status() === 401) {
       throw new Error(lastError)
     }
 
-    // Rate limited — wait for the auth window to reset
     if (res.status() === 429) {
       await sleep(65_000)
       continue
     }
 
-    // 404 / 5xx — dev server or route still compiling
     await sleep(3_000)
   }
 
-  if (!token) {
-    throw new Error(lastError)
-  }
-
-  await page.goto("/login")
-  await page.evaluate(
-    ([t, u]) => {
-      localStorage.setItem("clauseiq_token", t as string)
-      localStorage.setItem("clauseiq_user", JSON.stringify(u))
-    },
-    [token, user]
-  )
-
-  await page.goto("/dashboard")
-  await page.getByRole("heading", { name: "Welcome to ClauseIQ" }).waitFor({
-    timeout: 60_000,
-  })
-
-  await page.context().storageState({ path: authFile })
+  throw new Error(lastError)
 })

@@ -14,6 +14,7 @@ export const permissions = {
     'document:delete',
     'query:ask',
     'conversation:read',
+    'theme:write',
     'user:read',
     'user:delete',
   ],

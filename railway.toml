@@ -1,0 +1,6 @@
+[build]
+buildCommand = "npm ci && npx prisma generate && npm run build"
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "ON_FAILURE"

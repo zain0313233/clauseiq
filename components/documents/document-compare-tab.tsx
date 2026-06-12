@@ -14,7 +14,6 @@ import { toast } from "sonner"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { authHeaders } from "@/lib/auth-client"
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 import { cn } from "@/lib/utils"
 import {
@@ -67,7 +66,7 @@ export function DocumentCompareTab({
     try {
       const res = await fetch(
         `/api/documents/${documentId}/compare?templateId=${templateId}`,
-        { headers: authHeaders() }
+        { credentials: "include" }
       )
       const data = await res.json()
       if (res.ok) setComparison(data.comparison)
@@ -97,9 +96,9 @@ export function DocumentCompareTab({
     try {
       const res = await fetch(`/api/documents/${documentId}/compare`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders(),
         },
         body: JSON.stringify({ template_id: selectedTemplateId }),
       })

@@ -11,8 +11,8 @@ type AllDocumentsResponse = {
 
 export function useAllDocumentsQuery(enabled = true) {
   return useQuery({
-    queryKey: queryKeys.documents.all(),
-    queryFn: () => fetchJson<AllDocumentsResponse>("/api/documents"),
+    queryKey: queryKeys.documents.chat(),
+    queryFn: () => fetchJson<AllDocumentsResponse>("/api/documents?chat=1"),
     select: (data) => data.documents ?? [],
     enabled,
     placeholderData: (prev) => prev,

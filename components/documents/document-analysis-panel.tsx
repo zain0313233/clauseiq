@@ -2,6 +2,8 @@
 
 
 
+import dynamic from "next/dynamic"
+
 import { useCallback, useEffect, useState } from "react"
 
 import Link from "next/link"
@@ -46,17 +48,42 @@ import { Badge } from "@/components/ui/badge"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import { authHeaders } from "@/lib/auth-client"
 
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
 
 import { cn } from "@/lib/utils"
 
-import { DocumentChatTab } from "@/components/documents/document-chat-tab"
+const DocumentChatTab = dynamic(
+  () =>
+    import("@/components/documents/document-chat-tab").then((m) => ({
+      default: m.DocumentChatTab,
+    })),
+  { loading: () => <TabLoader /> }
+)
 
-import { DocumentCompareTab } from "@/components/documents/document-compare-tab"
+const DocumentCompareTab = dynamic(
+  () =>
+    import("@/components/documents/document-compare-tab").then((m) => ({
+      default: m.DocumentCompareTab,
+    })),
+  { loading: () => <TabLoader /> }
+)
 
-import { DocumentAgentsTab } from "@/components/documents/document-agents-tab"
+const DocumentAgentsTab = dynamic(
+  () =>
+    import("@/components/documents/document-agents-tab").then((m) => ({
+      default: m.DocumentAgentsTab,
+    })),
+  { loading: () => <TabLoader /> }
+)
+
+function TabLoader() {
+  return (
+    <div className="flex justify-center py-16">
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+    </div>
+  )
+}
 
 import type {
 
@@ -166,6 +193,10 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
   const [activeTab, setActiveTab] = useState("overview")
 
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set(["overview"])
+  )
+
   const [chatSeed, setChatSeed] = useState<{
 
     question: string
@@ -184,9 +215,9 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
       const [docRes, analysisRes] = await Promise.all([
 
-        fetch(`/api/documents/${documentId}`, { headers: authHeaders() }),
+        fetch(`/api/documents/${documentId}`, { credentials: "include" }),
 
-        fetch(`/api/documents/${documentId}/analysis`, { headers: authHeaders() }),
+        fetch(`/api/documents/${documentId}/analysis`, { credentials: "include" }),
 
       ])
 
@@ -222,6 +253,24 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
   useEffect(() => {
 
+    setVisitedTabs((prev) => {
+
+      if (prev.has(activeTab)) return prev
+
+      const next = new Set(prev)
+
+      next.add(activeTab)
+
+      return next
+
+    })
+
+  }, [activeTab])
+
+
+
+  useEffect(() => {
+
     if (!analysis || analysis.status !== "pending") return
 
     const id = setInterval(fetchData, 5000)
@@ -242,7 +291,7 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
         method: "POST",
 
-        headers: authHeaders(),
+        credentials: "include",
 
       })
 
@@ -285,6 +334,8 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
       key: Date.now(),
 
     })
+
+    setVisitedTabs((prev) => new Set(prev).add("chat"))
 
     setActiveTab("chat")
 
@@ -770,13 +821,17 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
           <TabsContent value="agents" className="mt-4">
 
-            <DocumentAgentsTab
+            {visitedTabs.has("agents") ? (
 
-              documentId={documentId}
+              <DocumentAgentsTab
 
-              documentReady={document.status === "ready"}
+                documentId={documentId}
 
-            />
+                documentReady={document.status === "ready"}
+
+              />
+
+            ) : null}
 
           </TabsContent>
 
@@ -1026,13 +1081,17 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
           <TabsContent value="compare" className="mt-4">
 
-            <DocumentCompareTab
+            {visitedTabs.has("compare") ? (
 
-              documentId={documentId}
+              <DocumentCompareTab
 
-              documentReady={document.status === "ready"}
+                documentId={documentId}
 
-            />
+                documentReady={document.status === "ready"}
+
+              />
+
+            ) : null}
 
           </TabsContent>
 
@@ -1040,19 +1099,23 @@ export function DocumentAnalysisPanel({ documentId }: { documentId: string }) {
 
           <TabsContent value="chat" className="mt-4">
 
-            <DocumentChatTab
+            {visitedTabs.has("chat") ? (
 
-              key={chatSeed?.key ?? "default"}
+              <DocumentChatTab
 
-              documentId={documentId}
+                key={chatSeed?.key ?? "default"}
 
-              documentTitle={document.title}
+                documentId={documentId}
 
-              initialQuestion={chatSeed?.question}
+                documentTitle={document.title}
 
-              initialMode={chatSeed?.mode}
+                initialQuestion={chatSeed?.question}
 
-            />
+                initialMode={chatSeed?.mode}
+
+              />
+
+            ) : null}
 
           </TabsContent>
 

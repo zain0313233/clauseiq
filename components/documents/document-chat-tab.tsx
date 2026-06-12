@@ -5,7 +5,6 @@ import { Loader2, BookOpen } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChatMessageBubble } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
-import { authHeaders } from "@/lib/auth-client"
 import { CLAUSEMIND_NAME, CLAUSEMIND_WELCOME } from "@/lib/clausemind"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/components/chat/types"
@@ -67,9 +66,9 @@ export function DocumentChatTab({
       try {
         const res = await fetch("/api/query", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            ...authHeaders(),
           },
           body: JSON.stringify({
             document_id: documentId,

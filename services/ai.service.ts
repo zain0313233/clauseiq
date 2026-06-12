@@ -1,3 +1,7 @@
+import { randomUUID } from 'crypto'
+import { createSignedFileUrl } from '@/lib/storage'
+import { getEngineApiSecret } from '@/lib/engine-secret'
+import { logger } from '@/lib/logger'
 import type {
   ClauseMindPortfolioResponse,
   ClauseMindQueryResponse,
@@ -5,6 +9,44 @@ import type {
 } from '@/lib/clausemind'
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000'
+
+function engineHeaders(): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${getEngineApiSecret()}`,
+    'x-request-id': randomUUID(),
+  }
+}
+
+async function signedUrl(fileUrlOrPath: string): Promise<string> {
+  return createSignedFileUrl(fileUrlOrPath)
+}
+
+async function assertEngineOk(response: Response, fallbackMessage: string): Promise<void> {
+  if (response.ok) return
+
+  let detail: unknown
+  try {
+    const body = await response.json()
+    detail = body?.detail ?? body?.error
+  } catch {
+    detail = undefined
+  }
+
+  logger.error('ai.engine.request_failed', {
+    status: response.status,
+    detail,
+    engineSecretLength: getEngineApiSecret().length,
+  })
+
+  if (response.status === 401) {
+    throw new Error(
+      'AI engine authentication failed — ensure ENGINE_API_SECRET matches in clauseiq/.env and clauseIqengine/.env, then restart both servers'
+    )
+  }
+
+  throw new Error(fallbackMessage)
+}
 
 export const aiService = {
   processDocument: async (data: {
@@ -15,11 +57,28 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/process/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
+      body: JSON.stringify({
+        ...data,
+        file_url: await signedUrl(data.file_url),
+      }),
+    })
+
+    await assertEngineOk(response, 'Failed to process document')
+    return response.json()
+  },
+
+  deleteDocumentVectors: async (data: {
+    document_id: string
+    user_id: string
+  }) => {
+    const response = await fetch(`${AI_ENGINE_URL}/process/delete-vectors`, {
+      method: 'POST',
+      headers: engineHeaders(),
       body: JSON.stringify(data),
     })
 
-    if (!response.ok) throw new Error('Failed to process document')
+    await assertEngineOk(response, 'Failed to delete document vectors')
     return response.json()
   },
 
@@ -31,7 +90,7 @@ export const aiService = {
   }): Promise<ClauseMindQueryResponse> => {
     const response = await fetch(`${AI_ENGINE_URL}/query/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
         question: data.question,
@@ -40,9 +99,8 @@ export const aiService = {
       }),
     })
 
-    const body = await response.json()
-    if (!response.ok) throw new Error(body.detail || body.error || 'Failed to query document')
-    return body as ClauseMindQueryResponse
+    await assertEngineOk(response, 'Query failed')
+    return (await response.json()) as ClauseMindQueryResponse
   },
 
   queryPortfolio: async (data: {
@@ -53,14 +111,12 @@ export const aiService = {
   }): Promise<ClauseMindPortfolioResponse> => {
     const response = await fetch(`${AI_ENGINE_URL}/portfolio/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify(data),
     })
 
+    await assertEngineOk(response, 'Portfolio query failed')
     const body = await response.json()
-    if (!response.ok) {
-      throw new Error(body.detail || body.error || 'Portfolio query failed')
-    }
 
     return {
       answer: body.answer,
@@ -87,6 +143,7 @@ export const aiService = {
   triggerComparison: async (data: {
     document_id: string
     template_id: string
+    user_id: string
     document_file_url: string
     document_file_type: string
     template_file_url: string
@@ -95,11 +152,15 @@ export const aiService = {
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/compare/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      headers: engineHeaders(),
+      body: JSON.stringify({
+        ...data,
+        document_file_url: await signedUrl(data.document_file_url),
+        template_file_url: await signedUrl(data.template_file_url),
+      }),
     })
 
-    if (!response.ok) throw new Error('Failed to trigger comparison')
+    await assertEngineOk(response, 'Failed to trigger comparison')
     return response.json()
   },
 
@@ -107,18 +168,20 @@ export const aiService = {
     document_id: string
     file_url: string
     file_type: string
+    user_id: string
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/agents/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
-        file_url: data.file_url,
+        file_url: await signedUrl(data.file_url),
         file_type: data.file_type,
+        user_id: data.user_id,
       }),
     })
 
-    if (!response.ok) throw new Error('Failed to trigger agent team')
+    await assertEngineOk(response, 'Failed to trigger agent team')
     return response.json()
   },
 
@@ -126,18 +189,20 @@ export const aiService = {
     document_id: string
     file_url: string
     file_type: string
+    user_id: string
   }) => {
     const response = await fetch(`${AI_ENGINE_URL}/analyze/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: engineHeaders(),
       body: JSON.stringify({
         document_id: data.document_id,
-        file_url: data.file_url,
+        file_url: await signedUrl(data.file_url),
         file_type: data.file_type,
+        user_id: data.user_id,
       }),
     })
 
-    if (!response.ok) throw new Error('Failed to trigger analysis')
+    await assertEngineOk(response, 'Failed to trigger analysis')
     return response.json()
   },
 }

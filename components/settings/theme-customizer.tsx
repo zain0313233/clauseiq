@@ -15,6 +15,8 @@ import {
   type SiteThemeConfig,
 } from "@/lib/theme"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-provider"
+import { hasPermission } from "@/lib/rbac"
 
 type ColorField = {
   key: keyof SiteThemeConfig
@@ -56,6 +58,8 @@ const colorFields: ColorField[] = [
 ]
 
 export function ThemeCustomizer() {
+  const { user } = useAuth()
+  const canEditTheme = hasPermission(user?.role ?? "user", "theme:write")
   const { theme, setThemeLocal, saveTheme, resetTheme, isSaving } = useTheme()
   const [draft, setDraft] = useState<SiteThemeConfig>(theme)
 
@@ -107,8 +111,9 @@ export function ThemeCustomizer() {
           Theme customization
         </CardTitle>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Customize colors for the entire ClauseIQ site — marketing pages, portal,
-          buttons, and text. Saved to database for all visitors.
+          {canEditTheme
+            ? "Customize colors for the entire ClauseIQ site — marketing pages, portal, buttons, and text. Saved to database for all visitors."
+            : "Preview theme colors locally. Only administrators can save site-wide theme changes."}
         </p>
       </CardHeader>
 
@@ -192,29 +197,33 @@ export function ThemeCustomizer() {
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-          <Button
-            size="sm"
-            className="gap-1.5"
-            disabled={isSaving}
-            onClick={handleSave}
-          >
-            {isSaving ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="h-3.5 w-3.5" />
-            )}
-            Save theme
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={isSaving}
-            onClick={handleReset}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset default
-          </Button>
+          {canEditTheme ? (
+            <>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={isSaving}
+                onClick={handleSave}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Save theme
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={isSaving}
+                onClick={handleReset}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset default
+              </Button>
+            </>
+          ) : null}
           <p className="flex w-full items-center gap-1.5 text-[10px] text-muted-foreground sm:w-auto sm:ml-auto">
             <Sparkles className="h-3 w-3" />
             Affects marketing, dashboard, chat &amp; all buttons

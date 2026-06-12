@@ -1,14 +1,12 @@
 import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { signAccessToken } from '@/lib/auth'
 import { userRepository } from '@/repositories/user.repository'
 import { SignupInput, LoginInput } from '@/validators/auth.schema'
-
-const JWT_SECRET = process.env.JWT_SECRET!
 
 export const userService = {
   signup: async (input: SignupInput) => {
     const existing = await userRepository.findByEmail(input.email)
-    if (existing) throw new Error('Email already in use')
+    if (existing) throw new Error('Unable to create account')
 
     const hashedPassword = await bcrypt.hash(input.password, 10)
 
@@ -18,10 +16,10 @@ export const userService = {
       password: hashedPassword,
     })
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' })
+    const token = signAccessToken(user.id, user.tokenVersion)
 
     return {
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
       token,
     }
   },
@@ -33,11 +31,15 @@ export const userService = {
     const isValid = await bcrypt.compare(input.password, user.password)
     if (!isValid) throw new Error('Invalid email or password')
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' })
+    const token = signAccessToken(user.id, user.tokenVersion)
 
     return {
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
       token,
     }
+  },
+
+  logout: async (userId: string) => {
+    await userRepository.incrementTokenVersion(userId)
   },
 }

@@ -12,7 +12,6 @@ import {
   applyThemeToDocument,
   type SiteThemeConfig,
 } from "@/lib/theme"
-import { authHeaders } from "@/lib/auth-client"
 
 type ThemeContextValue = {
   theme: SiteThemeConfig
@@ -70,9 +69,9 @@ export function ThemeProvider({
       try {
         const res = await fetch("/api/theme", {
           method: "PUT",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            ...authHeaders(),
           },
           body: JSON.stringify(t),
         })

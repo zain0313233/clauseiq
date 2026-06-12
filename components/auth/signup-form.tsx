@@ -8,6 +8,9 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
+
+
 import {
   Card,
   CardContent,
@@ -34,13 +37,14 @@ export function SignupForm() {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ name, email, password }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Signup failed")
 
-      login(data.token, data.user)
+      login(data.user)
       toast.success("Account created successfully!")
       router.push("/dashboard")
     } catch (err) {

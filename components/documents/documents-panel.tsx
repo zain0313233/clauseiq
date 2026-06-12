@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PaginationControls } from "@/components/ui/pagination-controls"
-import { authHeaders } from "@/lib/auth-client"
 import { useDocumentPolling } from "@/hooks/use-document-polling"
 import { useDocumentsQuery } from "@/hooks/use-documents-query"
 import { cn } from "@/lib/utils"
@@ -139,7 +138,7 @@ export function DocumentsPanel() {
     try {
       const res = await fetch(`/api/documents/${id}`, {
         method: "DELETE",
-        headers: authHeaders(),
+        credentials: "include",
       })
       if (!res.ok) {
         const body = await res.json()

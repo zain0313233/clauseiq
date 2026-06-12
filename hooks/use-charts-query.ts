@@ -17,7 +17,7 @@ export type TypeDistributionPoint = {
   color: string
 }
 
-type ChartsResponse = {
+export type ChartsData = {
   weeklyActivity: WeeklyActivityPoint[]
   typeDistribution: TypeDistributionPoint[]
 }
@@ -25,6 +25,6 @@ type ChartsResponse = {
 export function useChartsQuery() {
   return useQuery({
     queryKey: queryKeys.charts(),
-    queryFn: () => fetchJson<ChartsResponse>("/api/charts"),
+    queryFn: () => fetchJson<ChartsData>("/api/charts"),
   })
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { authHeaders } from "@/lib/auth-client"
 
 type DocumentLike = { id: string; status: string }
 
@@ -48,7 +47,7 @@ export function useSingleDocumentPolling(
     const poll = async () => {
       try {
         const res = await fetch(`/api/documents/${documentId}`, {
-          headers: authHeaders(),
+          credentials: "include",
         })
         const data = await res.json()
         if (res.ok && data.document?.status) {

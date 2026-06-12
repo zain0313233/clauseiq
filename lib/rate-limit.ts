@@ -12,3 +12,21 @@ export const authRateLimiter = new Ratelimit({
   limiter: Ratelimit.slidingWindow(5, '60 s'),
   analytics: true,
 })
+
+export const queryRateLimiter = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(30, '60 m'),
+  analytics: true,
+})
+
+export const uploadRateLimiter = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(5, '60 s'),
+  analytics: true,
+})
+
+export const aiProcessingRateLimiter = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '60 s'),
+  analytics: true,
+})
