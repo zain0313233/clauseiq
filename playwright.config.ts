@@ -46,6 +46,7 @@ export default defineConfig({
         timeout: 120_000,
         env: {
           PLAYWRIGHT_TEST: "1",
+          PLAYWRIGHT_SKIP_EMAIL_VERIFY: "1",
         },
       },
 })

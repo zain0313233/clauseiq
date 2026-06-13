@@ -7,6 +7,7 @@ import type {
   ClauseMindQueryResponse,
   QueryMode,
 } from '@/lib/clausemind'
+import type { ChatHistoryTurn } from '@/lib/conversation-history'
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000'
 
@@ -87,6 +88,7 @@ export const aiService = {
     question: string
     user_id: string
     mode?: QueryMode
+    history?: ChatHistoryTurn[]
   }): Promise<ClauseMindQueryResponse> => {
     const response = await fetch(`${AI_ENGINE_URL}/query/`, {
       method: 'POST',
@@ -95,7 +97,8 @@ export const aiService = {
         document_id: data.document_id,
         question: data.question,
         user_id: data.user_id,
-        mode: data.mode ?? 'default',
+        mode: data.mode ?? 'conversational',
+        history: data.history ?? [],
       }),
     })
 

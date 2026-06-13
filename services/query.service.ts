@@ -3,6 +3,7 @@ import { documentRepository } from "@/repositories/document.repository"
 import { messageRepository } from "@/repositories/message.repository"
 import { aiService } from "@/services/ai.service"
 import type { ClauseMindQueryResponse, QueryMode } from "@/lib/clausemind"
+import { buildConversationHistory } from "@/lib/conversation-history"
 import { sanitizeSourcesForStorage } from "@/lib/message-metadata"
 
 export const queryService = {
@@ -10,12 +11,18 @@ export const queryService = {
     userId: string,
     documentId: string,
     question: string,
-    mode: QueryMode = "default"
+    mode: QueryMode = "conversational"
   ): Promise<ClauseMindQueryResponse> => {
     const document = await documentRepository.findById(documentId)
     if (!document || document.userId !== userId) {
       throw new Error("Forbidden")
     }
+
+    const existing = await conversationRepository.findByUserAndDocument(
+      userId,
+      documentId
+    )
+    const history = buildConversationHistory(existing?.messages ?? [])
 
     const conversation = await conversationRepository.getOrCreate(
       userId,
@@ -29,6 +36,7 @@ export const queryService = {
         question,
         user_id: userId,
         mode,
+        history,
       })
     } catch (error) {
       throw error

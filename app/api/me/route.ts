@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
           name: user.name,
           email: user.email,
           role: user.role,
+          emailVerified: user.emailVerified,
         },
       },
       { status: 200, headers: CACHE.noStore }

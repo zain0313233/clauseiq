@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { userRepository } from '@/repositories/user.repository'
 import { documentRepository } from '@/repositories/document.repository'
 import { hasPermission } from '@/lib/rbac'
@@ -8,7 +8,7 @@ import { aiService } from '@/services/ai.service'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
     if (!hasPermission(user.role, 'query:ask')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

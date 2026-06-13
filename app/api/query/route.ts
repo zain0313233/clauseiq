@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
@@ -8,7 +8,7 @@ import { queryService } from '@/services/query.service'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
     if (!hasPermission(user.role, 'query:ask')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -31,7 +31,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
-    const queryMode = mode === 'plain_english' ? 'plain_english' : 'default'
+    const queryMode =
+      mode === 'plain_english'
+        ? 'plain_english'
+        : mode === 'default'
+          ? 'default'
+          : 'conversational'
     const result = await queryService.ask(userId, document_id, normalizedQuestion, queryMode)
 
     return NextResponse.json(result, { status: 200 })
@@ -40,6 +45,9 @@ export async function POST(req: NextRequest) {
     const message = error instanceof Error ? error.message : 'Query failed'
     if (message === 'Unauthorized') {
       return NextResponse.json({ error: message }, { status: 401 })
+    }
+    if (message === 'Email not verified') {
+      return NextResponse.json({ error: message }, { status: 403 })
     }
     if (message === 'Forbidden') {
       return NextResponse.json({ error: message }, { status: 403 })

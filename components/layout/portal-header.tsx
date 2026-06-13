@@ -1,12 +1,12 @@
 "use client"
 
-import { Bell, Menu, Search } from "lucide-react"
+import { Menu, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-provider"
 import { useSidebar } from "./sidebar-context"
+import { NotificationBell } from "./notification-bell"
 
 export function PortalHeader() {
   const { user } = useAuth()
@@ -44,15 +44,7 @@ export function PortalHeader() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2 md:gap-4">
-        <button
-          type="button"
-          className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Bell className="h-[18px] w-[18px]" />
-          <Badge className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center p-0 text-[10px] font-medium">
-            3
-          </Badge>
-        </button>
+        <NotificationBell />
 
         <Avatar className="h-9 w-9 border-2 border-emerald-500/40">
           <AvatarFallback className="bg-emerald-500/20 text-sm font-semibold text-emerald-400">

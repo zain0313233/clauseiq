@@ -25,13 +25,20 @@ import {
   CLAUSEMIND_NAME,
   CLAUSEMIND_TAGLINE,
   CLAUSEMIND_WELCOME,
+  type QueryConfidence,
   type QuerySource,
 } from "@/lib/clausemind"
+import { streamDocumentQuery } from "@/lib/query-stream"
+import {
+  createStreamReplyHandlers,
+  STREAM_STATUS,
+} from "@/lib/streaming-chat-reply"
 import { cn } from "@/lib/utils"
 import {
   useDocumentPolling,
   useSingleDocumentPolling,
 } from "@/hooks/use-document-polling"
+import { useRealtimeDocumentRefresh } from "@/hooks/use-realtime-stream"
 import { useAllDocumentsQuery } from "@/hooks/use-all-documents-query"
 import { queryKeys } from "@/lib/query-keys"
 import type { ChatDocument, ChatMessage } from "./types"
@@ -137,6 +144,10 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     },
     hasProcessing
   )
+
+  useRealtimeDocumentRefresh(hasProcessing, () => {
+    void refetchDocuments()
+  })
 
   useEffect(() => {
     if (initialDocumentId) setSelectedId(initialDocumentId)
@@ -254,6 +265,19 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     }))
   }
 
+  function updateMessage(
+    docId: string,
+    messageId: string,
+    patch: Partial<ChatMessage>
+  ) {
+    setMessagesByDoc((prev) => ({
+      ...prev,
+      [docId]: (prev[docId] || []).map((m) =>
+        m.id === messageId ? { ...m, ...patch } : m
+      ),
+    }))
+  }
+
   async function sendText(question: string) {
     if (!selectedId || !selectedDoc) return
 
@@ -266,39 +290,51 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
     })
     setLoading(true)
 
+    const assistantId = uid()
+    appendMessage(selectedId, {
+      id: assistantId,
+      role: "assistant",
+      type: "text",
+      content: STREAM_STATUS.analyzing,
+      streaming: true,
+      time: now(),
+    })
+
     try {
-      const res = await fetch("/api/query", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
+      let sources: QuerySource[] | undefined
+      let confidence: QueryConfidence | undefined
+
+      const reply = createStreamReplyHandlers({
+        onUpdate: (content, streaming) => {
+          updateMessage(selectedId, assistantId, { content, streaming })
         },
-        body: JSON.stringify({
-          document_id: selectedId,
-          question,
-          mode: plainEnglish ? "plain_english" : "default",
-        }),
+        onSources: (s) => {
+          sources = s as QuerySource[]
+          updateMessage(selectedId, assistantId, { sources })
+        },
+        onDone: (c) => {
+          confidence = c as QueryConfidence
+        },
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Request failed")
+      await streamDocumentQuery(
+        selectedId,
+        question,
+        plainEnglish ? "plain_english" : "conversational",
+        reply.handlers
+      )
 
-      appendMessage(selectedId, {
-        id: uid(),
-        role: "assistant",
-        type: "text",
-        content: data.answer || "No answer received.",
-        sources: data.sources,
-        confidence: data.confidence,
-        time: now(),
+      const finalText = reply.finalize()
+      updateMessage(selectedId, assistantId, {
+        content: finalText || "No answer received.",
+        sources,
+        confidence,
+        streaming: false,
       })
     } catch (err) {
-      appendMessage(selectedId, {
-        id: uid(),
-        role: "assistant",
-        type: "text",
+      updateMessage(selectedId, assistantId, {
         content: err instanceof Error ? err.message : "Something went wrong",
-        time: now(),
+        streaming: false,
       })
     } finally {
       setLoading(false)
@@ -464,7 +500,7 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
                       <ChatMessageBubble key={msg.id} message={msg} />
                     ))}
 
-                    {loading && (
+                    {loading && !messages.some((m) => m.streaming) && (
                       <div className="flex gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
                           AI

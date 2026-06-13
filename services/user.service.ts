@@ -1,7 +1,29 @@
 import bcrypt from 'bcryptjs'
 import { signAccessToken } from '@/lib/auth'
 import { userRepository } from '@/repositories/user.repository'
+import { otpService } from '@/services/otp.service'
 import { SignupInput, LoginInput } from '@/validators/auth.schema'
+
+function toPublicUser(user: {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  emailVerified: boolean
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    emailVerified: user.emailVerified,
+  }
+}
+
+function skipEmailVerification(): boolean {
+  // Only skip during Playwright E2E (injected by playwright.config webServer env)
+  return process.env.PLAYWRIGHT_SKIP_EMAIL_VERIFY === '1'
+}
 
 export const userService = {
   signup: async (input: SignupInput) => {
@@ -9,17 +31,23 @@ export const userService = {
     if (existing) throw new Error('Unable to create account')
 
     const hashedPassword = await bcrypt.hash(input.password, 10)
+    const verifyNow = skipEmailVerification()
 
     const user = await userRepository.create({
       name: input.name,
       email: input.email,
       password: hashedPassword,
+      emailVerified: verifyNow,
     })
+
+    if (!verifyNow) {
+      await otpService.sendCode(user.email, 'verify_email')
+    }
 
     const token = signAccessToken(user.id, user.tokenVersion)
 
     return {
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: toPublicUser(user),
       token,
     }
   },
@@ -34,7 +62,7 @@ export const userService = {
     const token = signAccessToken(user.id, user.tokenVersion)
 
     return {
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: toPublicUser(user),
       token,
     }
   },

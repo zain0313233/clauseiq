@@ -3,6 +3,7 @@ export type AuthUser = {
   name: string | null
   email: string
   role: string
+  emailVerified: boolean
 }
 
 /** @deprecated Token is HttpOnly — use credentials: 'include' on fetch instead */

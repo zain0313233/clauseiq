@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, BookOpen } from "lucide-react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChatMessageBubble } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { CLAUSEMIND_NAME, CLAUSEMIND_WELCOME } from "@/lib/clausemind"
+import type { QueryMode, QueryConfidence } from "@/lib/clausemind"
+import { streamDocumentQuery } from "@/lib/query-stream"
+import {
+  createStreamReplyHandlers,
+  STREAM_STATUS,
+} from "@/lib/streaming-chat-reply"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/components/chat/types"
-import type { QueryMode } from "@/lib/clausemind"
 
 type DocumentChatTabProps = {
   documentId: string
@@ -33,7 +37,7 @@ export function DocumentChatTab({
   documentId,
   documentTitle,
   initialQuestion,
-  initialMode = "default",
+  initialMode = "conversational",
   onQuestionSent,
 }: DocumentChatTabProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -52,7 +56,7 @@ export function DocumentChatTab({
   )
 
   const sendText = useCallback(
-    async (question: string, mode: QueryMode = plainEnglish ? "plain_english" : "default") => {
+    async (question: string, mode: QueryMode = plainEnglish ? "plain_english" : "conversational") => {
       const userMsg: ChatMessage = {
         id: uid(),
         role: "user",
@@ -63,46 +67,72 @@ export function DocumentChatTab({
       setMessages((prev) => [...prev, userMsg])
       setLoading(true)
 
+      const assistantId = uid()
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          type: "text",
+          content: STREAM_STATUS.analyzing,
+          streaming: true,
+          time: now(),
+        },
+      ])
+
       try {
-        const res = await fetch("/api/query", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
+        let sources: ChatMessage["sources"]
+        let confidence: QueryConfidence | undefined
+
+        const reply = createStreamReplyHandlers({
+          onUpdate: (content, streaming) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content, streaming } : m
+              )
+            )
           },
-          body: JSON.stringify({
-            document_id: documentId,
-            question,
-            mode,
-          }),
+          onSources: (s) => {
+            sources = s as ChatMessage["sources"]
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, sources: s as ChatMessage["sources"] } : m
+              )
+            )
+          },
+          onDone: (c) => {
+            confidence = c as QueryConfidence
+          },
         })
 
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || "Request failed")
+        await streamDocumentQuery(documentId, question, mode, reply.handlers)
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: uid(),
-            role: "assistant",
-            type: "text",
-            content: data.answer || "No answer received.",
-            sources: data.sources,
-            confidence: data.confidence,
-            time: now(),
-          },
-        ])
+        const finalText = reply.finalize()
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: finalText || m.content || "No answer received.",
+                  sources: sources ?? m.sources,
+                  confidence: confidence ?? m.confidence,
+                  streaming: false,
+                }
+              : m
+          )
+        )
       } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: uid(),
-            role: "assistant",
-            type: "text",
-            content: err instanceof Error ? err.message : "Something went wrong",
-            time: now(),
-          },
-        ])
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: err instanceof Error ? err.message : "Something went wrong",
+                  streaming: false,
+                }
+              : m
+          )
+        )
       } finally {
         setLoading(false)
         onQuestionSent?.()
@@ -140,12 +170,12 @@ export function DocumentChatTab({
         </button>
       </div>
 
-      <ScrollArea className="flex-1 bg-muted/10">
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/10">
         <div className="space-y-4 p-4">
           {messages.map((msg) => (
             <ChatMessageBubble key={msg.id} message={msg} />
           ))}
-          {loading && (
+          {loading && !messages.some((m) => m.streaming) && (
             <div className="flex gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
                 CM
@@ -157,15 +187,17 @@ export function DocumentChatTab({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
-      <ChatInput
+      <div className="shrink-0">
+        <ChatInput
         disabled={loading}
         loading={loading}
         onSendText={(text) => sendText(text)}
         onSendImage={() => {}}
         onSendVoice={() => {}}
-      />
+        />
+      </div>
     </div>
   )
 }
