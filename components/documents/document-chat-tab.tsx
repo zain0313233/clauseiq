@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, BookOpen } from "lucide-react"
+import { toast } from "sonner"
 import { ChatMessageBubble } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { CLAUSEMIND_NAME, CLAUSEMIND_WELCOME } from "@/lib/clausemind"
 import type { QueryMode, QueryConfidence } from "@/lib/clausemind"
 import { streamDocumentQuery } from "@/lib/query-stream"
+import { useAuth } from "@/contexts/auth-provider"
 import {
   createStreamReplyHandlers,
   STREAM_STATUS,
@@ -40,6 +42,7 @@ export function DocumentChatTab({
   initialMode = "conversational",
   onQuestionSent,
 }: DocumentChatTabProps) {
+  const { refreshUser } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -102,6 +105,12 @@ export function DocumentChatTab({
           },
           onDone: (c) => {
             confidence = c as QueryConfidence
+          },
+          onAccessRestricted: () => {
+            void refreshUser()
+          },
+          onWarning: (text) => {
+            toast.warning(text)
           },
         })
 

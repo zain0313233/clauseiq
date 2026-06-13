@@ -103,7 +103,19 @@ export const aiService = {
     })
 
     await assertEngineOk(response, 'Query failed')
-    return (await response.json()) as ClauseMindQueryResponse
+    const body = await response.json()
+    return {
+      answer: body.answer,
+      sources: (body.sources || []).map(
+        (s: { content: string; chunk_index: number; score: number }) => ({
+          content: s.content,
+          chunkIndex: s.chunk_index,
+          score: s.score,
+        })
+      ),
+      confidence: body.confidence,
+      irrelevant: body.irrelevant === true,
+    } as ClauseMindQueryResponse
   },
 
   queryPortfolio: async (data: {
@@ -206,6 +218,27 @@ export const aiService = {
     })
 
     await assertEngineOk(response, 'Failed to trigger analysis')
+    return response.json()
+  },
+
+  validateDocument: async (data: {
+    document_id: string
+    title?: string
+    reviewed_by?: string | null
+    persist?: boolean
+  }) => {
+    const response = await fetch(`${AI_ENGINE_URL}/validate/document`, {
+      method: 'POST',
+      headers: engineHeaders(),
+      body: JSON.stringify({
+        document_id: data.document_id,
+        title: data.title ?? '',
+        reviewed_by: data.reviewed_by ?? null,
+        persist: data.persist ?? true,
+      }),
+    })
+
+    await assertEngineOk(response, 'Document validation failed')
     return response.json()
   },
 }

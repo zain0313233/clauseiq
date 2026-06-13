@@ -16,6 +16,7 @@ import {
   FileSearch,
   Languages,
 } from "lucide-react"
+import { toast } from "sonner"
 import { useSidebar } from "@/components/layout/sidebar-context"
 import { Button } from "@/components/ui/button"
 import { ChatInbox } from "./chat-inbox"
@@ -29,6 +30,7 @@ import {
   type QuerySource,
 } from "@/lib/clausemind"
 import { streamDocumentQuery } from "@/lib/query-stream"
+import { useAuth } from "@/contexts/auth-provider"
 import {
   createStreamReplyHandlers,
   STREAM_STATUS,
@@ -79,6 +81,7 @@ type ChatWorkspaceProps = {
 export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { refreshUser } = useAuth()
   const { isMobile } = useSidebar()
   const {
     data: documents = [],
@@ -314,6 +317,12 @@ export function ChatWorkspace({ initialDocumentId }: ChatWorkspaceProps) {
         },
         onDone: (c) => {
           confidence = c as QueryConfidence
+        },
+        onAccessRestricted: () => {
+          void refreshUser()
+        },
+        onWarning: (text) => {
+          toast.warning(text)
         },
       })
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { templateRepository } from '@/repositories/template.repository'
 import { comparisonRepository } from '@/repositories/comparison.repository'
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     const templateId = req.nextUrl.searchParams.get('templateId')
     if (!hasPermission(user.role, 'document:read')) {
@@ -43,7 +43,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -5,6 +5,9 @@ export const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
   password: passwordSchema,
+  acceptedTerms: z.literal(true, {
+    message: 'You must accept the acceptable use terms',
+  }),
 })
 
 export const loginSchema = z.object({

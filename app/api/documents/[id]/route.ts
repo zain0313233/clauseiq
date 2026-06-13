@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { userRepository } from '@/repositories/user.repository'
 import { hasPermission } from '@/lib/rbac'
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -36,7 +36,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:delete')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

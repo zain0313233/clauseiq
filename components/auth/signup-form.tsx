@@ -14,6 +14,7 @@ import {
   passwordsMatch,
 } from "@/lib/password-validation"
 import { signupSchema } from "@/validators/auth.schema"
+import { ACCEPTABLE_USE_LABEL } from "@/lib/access-policy"
 
 export function SignupForm() {
   const router = useRouter()
@@ -25,6 +26,7 @@ export function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const requirements = getPasswordRequirements(password)
   const allRequirementsMet = requirements.every((r) => r.met)
@@ -32,7 +34,7 @@ export function SignupForm() {
     confirmPassword.length > 0 && passwordsMatch(password, confirmPassword)
 
   function validateForm(): string | null {
-    const parsed = signupSchema.safeParse({ name, email, password })
+    const parsed = signupSchema.safeParse({ name, email, password, acceptedTerms })
     if (!parsed.success) {
       return parsed.error.issues[0]?.message ?? "Invalid form data"
     }
@@ -58,7 +60,7 @@ export function SignupForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, acceptedTerms: true }),
       })
 
       const data = await res.json()
@@ -214,6 +216,16 @@ export function SignupForm() {
           )}
         </div>
 
+        <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-xs leading-relaxed text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border"
+          />
+          <span>{ACCEPTABLE_USE_LABEL}</span>
+        </label>
+
         <Button
           type="submit"
           size="lg"
@@ -222,7 +234,8 @@ export function SignupForm() {
             loading ||
             !allRequirementsMet ||
             !passwordsAreMatching ||
-            confirmPassword.length === 0
+            confirmPassword.length === 0 ||
+            !acceptedTerms
           }
         >
           {loading ? (

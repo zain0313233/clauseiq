@@ -219,4 +219,36 @@ export const documentRepository = {
   delete: async (id: string) => {
     return prisma.document.delete({ where: { id } })
   },
+
+  getChunksPreview: async (documentId: string, limit = 10) => {
+    return prisma.chunk.findMany({
+      where: { documentId },
+      orderBy: { chunkIndex: 'asc' },
+      take: limit,
+      select: { content: true, chunkIndex: true },
+    })
+  },
+
+  updateContentReview: async (
+    id: string,
+    data: {
+      contentReviewStatus: string
+      contentReviewNotes?: unknown
+      contentReviewedBy?: string | null
+      queriesEnabled?: boolean
+    }
+  ) => {
+    return prisma.document.update({
+      where: { id },
+      data: {
+        contentReviewStatus: data.contentReviewStatus,
+        contentReviewNotes: data.contentReviewNotes ?? undefined,
+        contentReviewedAt: new Date(),
+        contentReviewedBy: data.contentReviewedBy ?? null,
+        ...(data.queriesEnabled !== undefined
+          ? { queriesEnabled: data.queriesEnabled }
+          : {}),
+      },
+    })
+  },
 }

@@ -16,6 +16,12 @@ model User {
   tokenVersion    Int       @default(0)
   emailVerified   Boolean   @default(false)
   emailVerifiedAt DateTime?
+  accessRestricted Boolean  @default(false)
+  accessRestrictedAt DateTime?
+  accessRestrictedReason String?
+  consecutiveIrrelevantCount Int @default(0)
+  unblockRequestPending Boolean @default(false)
+  unblockRequestedAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -23,6 +29,36 @@ model User {
   conversations     Conversation[]
   standardTemplates StandardTemplate[]
   notifications     Notification[]
+  auditLogsAsActor  AccessAuditLog[] @relation("AuditActor")
+  auditLogsAsTarget AccessAuditLog[] @relation("AuditTarget")
+}
+
+model AccessAuditLog {
+  id           String   @id @default(cuid())
+  action       String
+  actorUserId  String?
+  targetUserId String
+  documentId   String?
+  question     String?
+  reason       String?
+  metadata     Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  actor  User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target User  @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([targetUserId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+}
+
+model PlatformSettings {
+  id                       String   @id @default("singleton")
+  maxConsecutiveIrrelevant Int      @default(5)
+  strikeWarningAt          Int      @default(3)
+  appealSlaBusinessDays    Int      @default(2)
+  updatedById              String?
+  updatedAt                DateTime @updatedAt
 }
 
 model Notification {
@@ -68,6 +104,11 @@ model Document {
   effectiveDate        String?
   expirationDate       String?
   unlimitedLiability   Boolean  @default(false)
+  contentReviewStatus  String   @default("valid") // valid, suspicious, rejected, pending
+  contentReviewNotes   Json?
+  contentReviewedAt    DateTime?
+  contentReviewedBy    String?
+  queriesEnabled       Boolean  @default(true)
   userId               String
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

@@ -91,3 +91,82 @@ export async function sendPasswordChangedEmail(to: string): Promise<void> {
     `,
   })
 }
+
+function adminPortalUrl(path: string): string {
+  const base = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  return `${base.replace(/\/$/, '')}${path}`
+}
+
+function adminEmailShell(title: string, bodyHtml: string): string {
+  return `
+    <div style="font-family:Inter,Segoe UI,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+      <h2 style="color:#0F172A;margin:0 0 12px;">${title}</h2>
+      ${bodyHtml}
+      <p style="color:#94a3b8;font-size:13px;margin-top:24px;">ClauseIQ Platform Admin</p>
+    </div>
+  `
+}
+
+export async function sendAdminUnblockRequestEmail(data: {
+  adminEmail: string
+  userEmail: string
+  userName: string | null
+  requestedAt: string
+}): Promise<void> {
+  if (process.env.PLAYWRIGHT_TEST === '1') {
+    console.info(`[email:admin-unblock] → ${data.adminEmail}: ${data.userEmail}`)
+    return
+  }
+
+  const transporter = nodemailer.createTransport(smtpConfig())
+  const reviewUrl = adminPortalUrl('/admin/users?needsAction=1')
+
+  await transporter.sendMail({
+    from: fromAddress(),
+    to: data.adminEmail,
+    subject: `[ClauseIQ] Unblock request — ${data.userEmail}`,
+    text: `${data.userName ?? data.userEmail} requested portal access restoration. Review: ${reviewUrl}`,
+    html: adminEmailShell(
+      'Unblock request pending',
+      `<p style="color:#475569;"><strong>${data.userName ?? 'User'}</strong> (${data.userEmail}) requested admin review to restore portal access.</p>
+       <p style="color:#475569;">Requested: ${new Date(data.requestedAt).toLocaleString()}</p>
+       <p style="margin-top:20px;"><a href="${reviewUrl}" style="background:#14b8a6;color:#042f2e;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Review in admin panel</a></p>`
+    ),
+  })
+}
+
+export async function sendAccessRestrictedEmail(to: string, maxStrikes: number): Promise<void> {
+  if (process.env.PLAYWRIGHT_TEST === '1') return
+
+  const transporter = nodemailer.createTransport(smtpConfig())
+
+  await transporter.sendMail({
+    from: fromAddress(),
+    to,
+    subject: 'ClauseIQ access temporarily restricted',
+    text: `Your ClauseIQ portal access was restricted after ${maxStrikes} consecutive off-topic ClauseMind messages. Log in and use "Request unblock" for admin review.`,
+    html: adminEmailShell(
+      'Access restricted',
+      `<p style="color:#475569;">Your portal access was temporarily restricted after repeated off-topic ClauseMind usage.</p>
+       <p style="color:#475569;">Sign in and submit an unblock request — an admin will review it.</p>`
+    ),
+  })
+}
+
+export async function sendAccessRestoredEmail(to: string): Promise<void> {
+  if (process.env.PLAYWRIGHT_TEST === '1') return
+
+  const transporter = nodemailer.createTransport(smtpConfig())
+
+  await transporter.sendMail({
+    from: fromAddress(),
+    to,
+    subject: 'ClauseIQ access restored',
+    text: 'Your ClauseIQ portal access has been restored. Please use ClauseMind for contract-related questions only.',
+    html: adminEmailShell(
+      'Access restored',
+      `<p style="color:#475569;">Your portal access has been restored by an admin.</p>
+       <p style="color:#475569;">Please use ClauseMind only for questions about your uploaded contracts.</p>`
+    ),
+  })
+}

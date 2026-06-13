@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import { encodeSseEvent, SSE_HEADERS } from '@/lib/sse'
 import { prisma } from '@/lib/prisma'
 
@@ -10,7 +10,7 @@ const WATCH_INTERVAL_MS = 2_000
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
 
     const stream = new ReadableStream({
       start(controller) {
