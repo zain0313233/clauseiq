@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { userRepository } from '@/repositories/user.repository'
 import { CACHE } from '@/lib/cache-headers'
 import { dashboardRepository } from '@/repositories/dashboard.repository'
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
 
     const [weeklyActivity, typeDistribution] = await Promise.all([

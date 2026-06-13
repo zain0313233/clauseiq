@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { parseLimit, parsePage } from '@/lib/pagination'
 import { userRepository } from '@/repositories/user.repository'
 import { analysisRepository } from '@/repositories/analysis.repository'
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
 
     const { searchParams } = req.nextUrl

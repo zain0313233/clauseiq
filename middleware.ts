@@ -94,7 +94,12 @@ export async function middleware(req: NextRequest) {
     return withCommonHeaders(NextResponse.next(), requestId)
   }
 
-  if (!skipRateLimit && (pathname === '/api/login' || pathname === '/api/signup')) {
+  if (
+    !skipRateLimit &&
+    (pathname === '/api/login' ||
+      pathname === '/api/signup' ||
+      pathname.startsWith('/api/auth/'))
+  ) {
     const allowed = await limitIpAndUser(ip, userRateKey, authRateLimiter)
     if (!allowed) {
       return withCommonHeaders(
@@ -109,7 +114,9 @@ export async function middleware(req: NextRequest) {
 
   if (
     !skipRateLimit &&
-    (pathname === '/api/query' || pathname === '/api/query/portfolio')
+    (pathname === '/api/query' ||
+      pathname === '/api/query-stream' ||
+      pathname === '/api/query/portfolio')
   ) {
     const allowed = await limitIpAndUser(ip, userRateKey, queryRateLimiter)
     if (!allowed) {

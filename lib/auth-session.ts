@@ -18,3 +18,11 @@ export async function requireAuthUser(req: NextRequest): Promise<User> {
 
   return user
 }
+
+export async function requireEmailVerified(req: NextRequest): Promise<User> {
+  const user = await requireAuthUser(req)
+  if (!user.emailVerified) {
+    throw new Error('Email not verified')
+  }
+  return user
+}

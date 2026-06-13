@@ -1,12 +1,10 @@
 import { z } from 'zod'
+import { passwordSchema } from '@/lib/password-validation'
 
 export const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  password: z
-    .string()
-    .min(10, 'Password must be at least 10 characters')
-    .max(128, 'Password must be at most 128 characters'),
+  password: passwordSchema,
 })
 
 export const loginSchema = z.object({

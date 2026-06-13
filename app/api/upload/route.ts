@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { validateUploadFile } from '@/lib/file-validation'
 import { uploadService } from '@/services/upload.service'
 import { userRepository } from '@/repositories/user.repository'
@@ -8,7 +8,7 @@ import { aiService } from '@/services/ai.service'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:upload')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
     const message = error instanceof Error ? error.message : 'Upload failed'
     if (message === 'Unauthorized') {
       return NextResponse.json({ error: message }, { status: 401 })
+    }
+    if (message === 'Email not verified') {
+      return NextResponse.json({ error: message }, { status: 403 })
     }
     return NextResponse.json({ error: message }, { status: 400 })
   }

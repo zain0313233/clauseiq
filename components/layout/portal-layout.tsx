@@ -1,6 +1,8 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useRequireAuth } from "@/contexts/auth-provider"
 import { PortalSidebar } from "./portal-sidebar"
 import { PortalHeader } from "./portal-header"
@@ -14,8 +16,15 @@ export function PortalLayout({
   fullBleed?: boolean
 }) {
   const { user, isLoading } = useRequireAuth()
+  const router = useRouter()
 
-  if (isLoading || !user) {
+  useEffect(() => {
+    if (!isLoading && user && !user.emailVerified) {
+      router.replace("/verify-email")
+    }
+  }, [user, isLoading, router])
+
+  if (isLoading || !user || !user.emailVerified) {
     return (
       <div className="dark flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

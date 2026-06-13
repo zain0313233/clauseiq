@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { useDocumentPolling } from "@/hooks/use-document-polling"
+import { useRealtimeDocumentRefresh } from "@/hooks/use-realtime-stream"
 import { useDocumentsQuery } from "@/hooks/use-documents-query"
 import { cn } from "@/lib/utils"
 import {
@@ -154,6 +155,10 @@ export function DocumentsPanel() {
   }
 
   useDocumentPolling(documents, () => {
+    void refetch()
+  })
+
+  useRealtimeDocumentRefresh(true, () => {
     void refetch()
   })
 

@@ -58,20 +58,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white">
+      <Card className="border-0 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/20">
         <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold leading-tight tracking-tight">
+            <h1 className="text-2xl font-semibold leading-tight tracking-tight text-white">
               Welcome to ClauseIQ
             </h1>
-            <p className="mt-1.5 text-sm leading-normal text-white/75">
+            <p className="mt-1.5 text-sm leading-normal text-primary-foreground/80 text-white">
               ClauseMind analyzes your contracts — risks, summaries, and Q&amp;A
             </p>
           </div>
           <Button
             variant="secondary"
             size="sm"
-            className="w-fit bg-white/15 text-sm font-medium text-white hover:bg-white/25"
+            className="w-fit bg-primary-foreground/15 text-sm font-medium text-primary-foreground hover:bg-primary-foreground/25 text-white"
             onClick={() => void handleRefresh()}
             disabled={refreshing}
           >

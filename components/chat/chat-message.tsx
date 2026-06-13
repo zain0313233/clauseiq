@@ -6,6 +6,7 @@ import { Mic, Play, ChevronDown, ChevronUp, BookOpen } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { CLAUSEMIND_NAME } from "@/lib/clausemind"
+import { isStreamStatusText } from "@/lib/streaming-chat-reply"
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "./types"
 
@@ -19,6 +20,7 @@ export function ChatMessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user"
   const [showSources, setShowSources] = useState(false)
   const hasSources = !isUser && message.sources && message.sources.length > 0
+  const isStatusLine = !isUser && message.streaming && isStreamStatusText(message.content)
 
   return (
     <div
@@ -68,10 +70,17 @@ export function ChatMessageBubble({ message }: { message: ChatMessage }) {
               "rounded-2xl px-3.5 py-2.5 text-sm leading-normal whitespace-pre-wrap",
               isUser
                 ? "bg-primary text-primary-foreground"
-                : "border border-border/60 bg-card text-foreground"
+                : "border border-border/60 bg-card text-foreground",
+              isStatusLine && "text-muted-foreground italic"
             )}
           >
             {message.content}
+            {message.streaming && !isStatusLine && (
+              <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary align-middle" />
+            )}
+            {isStatusLine && (
+              <span className="ml-1 inline-block animate-pulse">|</span>
+            )}
           </div>
         )}
 

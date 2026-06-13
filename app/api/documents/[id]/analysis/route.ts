@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuthUser } from '@/lib/auth-session'
+import { requireEmailVerified } from '@/lib/auth-session'
 import { documentRepository } from '@/repositories/document.repository'
 import { analysisRepository } from '@/repositories/analysis.repository'
 import { userRepository } from '@/repositories/user.repository'
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -38,7 +38,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const user = await requireAuthUser(req)
+    const user = await requireEmailVerified(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

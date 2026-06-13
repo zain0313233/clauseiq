@@ -10,6 +10,7 @@ export type ChatMessage = {
   time: string
   sources?: QuerySource[]
   confidence?: QueryConfidence
+  streaming?: boolean
 }
 
 export type ChatDocument = {
