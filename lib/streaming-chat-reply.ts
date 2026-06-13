@@ -13,6 +13,8 @@ type StreamReplyOptions = {
   onUpdate: (content: string, streaming: boolean) => void
   onSources?: (sources: unknown) => void
   onDone?: (confidence: unknown) => void
+  onWarning?: (text: string) => void
+  onAccessRestricted?: () => void
 }
 
 export function createStreamReplyHandlers(options: StreamReplyOptions) {
@@ -45,6 +47,12 @@ export function createStreamReplyHandlers(options: StreamReplyOptions) {
       onDone: (confidence: unknown) => {
         typewriter.flush()
         options.onDone?.(confidence)
+      },
+      onWarning: (text: string) => {
+        options.onWarning?.(text)
+      },
+      onAccessRestricted: () => {
+        options.onAccessRestricted?.()
       },
     },
     finalize: () => {

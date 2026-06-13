@@ -14,13 +14,42 @@ export const userRepository = {
     email: string
     password: string
     emailVerified?: boolean
+    role?: string
   }) => {
     return prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: data.password,
+        role: data.role ?? 'user',
         emailVerified: data.emailVerified ?? false,
+        emailVerifiedAt: data.emailVerified ? new Date() : undefined,
+      },
+    })
+  },
+
+  upsertAdmin: async (data: {
+    name: string
+    email: string
+    passwordHash: string
+  }) => {
+    const email = data.email.trim().toLowerCase()
+    return prisma.user.upsert({
+      where: { email },
+      create: {
+        name: data.name,
+        email,
+        password: data.passwordHash,
+        role: 'admin',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+      update: {
+        name: data.name,
+        password: data.passwordHash,
+        role: 'admin',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
       },
     })
   },

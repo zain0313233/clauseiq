@@ -10,6 +10,8 @@ function toPublicUser(user: {
   email: string
   role: string
   emailVerified: boolean
+  accessRestricted?: boolean
+  unblockRequestPending?: boolean
 }) {
   return {
     id: user.id,
@@ -17,6 +19,8 @@ function toPublicUser(user: {
     email: user.email,
     role: user.role,
     emailVerified: user.emailVerified,
+    accessRestricted: user.accessRestricted ?? false,
+    unblockRequestPending: user.unblockRequestPending ?? false,
   }
 }
 

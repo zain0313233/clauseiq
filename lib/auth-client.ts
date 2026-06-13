@@ -4,6 +4,8 @@ export type AuthUser = {
   email: string
   role: string
   emailVerified: boolean
+  accessRestricted?: boolean
+  unblockRequestPending?: boolean
 }
 
 /** @deprecated Token is HttpOnly — use credentials: 'include' on fetch instead */

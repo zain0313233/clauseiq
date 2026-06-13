@@ -18,6 +18,9 @@ export type ClauseMindQueryResponse = {
   answer: string
   sources: QuerySource[]
   confidence: QueryConfidence
+  irrelevant?: boolean
+  strike_warning?: string | null
+  access_restricted?: boolean
 }
 
 export type PortfolioSource = {

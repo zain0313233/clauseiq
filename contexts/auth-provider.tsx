@@ -15,6 +15,7 @@ type AuthContextValue = {
   isLoading: boolean
   login: (user: AuthUser) => void
   logout: () => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -54,8 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/me", { credentials: "include" })
+      if (!res.ok) return
+      const data = (await res.json()) as { user: AuthUser | null }
+      if (data.user) setUser(data.user)
+    } catch {
+      // ignore
+    }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )
@@ -68,11 +80,24 @@ export function useAuth() {
 }
 
 export function useRequireAuth(redirectTo = "/login") {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, refreshUser } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (!isLoading && !user) {
+      router.replace(redirectTo)
+    }
+  }, [user, isLoading, router, redirectTo])
+
+  return { user, isLoading, refreshUser }
+}
+
+export function useRequireAdmin(redirectTo = "/dashboard") {
+  const { user, isLoading } = useRequireAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && user && user.role !== "admin") {
       router.replace(redirectTo)
     }
   }, [user, isLoading, router, redirectTo])

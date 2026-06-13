@@ -10,9 +10,11 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  Scale,
   Shield,
   X,
+  Users,
+  Activity,
+  SlidersHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-provider"
@@ -20,15 +22,33 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useSidebar } from "./sidebar-context"
+import { useAdminAccessAlerts } from "@/hooks/use-admin-access-alerts"
+import { Badge } from "@/components/ui/badge"
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Documents", href: "/dashboard/documents", icon: FileText },
-  { label: "Upload", href: "/dashboard/upload", icon: Upload },
-  { label: "Standards", href: "/dashboard/standards", icon: Shield },
-  { label: "Chat", href: "/chat", icon: MessageSquare },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+const workspaceNavItems = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, exact: false },
+  { label: "Documents", href: "/dashboard/documents", icon: FileText, exact: false },
+  { label: "Upload", href: "/dashboard/upload", icon: Upload, exact: false },
+  { label: "Standards", href: "/dashboard/standards", icon: Shield, exact: false },
+  { label: "Chat", href: "/chat", icon: MessageSquare, exact: false },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings, exact: false },
 ]
+
+const platformNavItems = [
+  { label: "Overview", href: "/admin", icon: LayoutDashboard, exact: true },
+  { label: "Users", href: "/admin/users", icon: Users, exact: false },
+  { label: "All Documents", href: "/admin/documents", icon: FileText, exact: false },
+  { label: "System", href: "/admin/system", icon: Activity, exact: false },
+  { label: "Admin Settings", href: "/admin/settings", icon: SlidersHorizontal, exact: false },
+]
+
+function isNavActive(pathname: string, href: string, exact?: boolean) {
+  if (exact) return pathname === href
+  if (href === "/dashboard") {
+    return pathname === "/dashboard"
+  }
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function PortalSidebar() {
   const pathname = usePathname()
@@ -37,6 +57,10 @@ export function PortalSidebar() {
   const { collapsed, mobileOpen, isMobile, closeMobileSidebar } = useSidebar()
 
   const showCollapsed = collapsed && !isMobile
+  const isAdmin = user?.role === "admin"
+  const onAdminRoute = pathname.startsWith("/admin")
+  const { data: accessAlerts } = useAdminAccessAlerts(!!isAdmin)
+  const pendingUnblockCount = accessAlerts?.alerts.pendingUnblockCount ?? 0
 
   useEffect(() => {
     closeMobileSidebar()
@@ -87,7 +111,7 @@ export function PortalSidebar() {
           )}
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Scale className="h-5 w-5" />
+            <Shield className="h-5 w-5" />
           </div>
           <div
             className={cn(
@@ -116,13 +140,15 @@ export function PortalSidebar() {
           )}
         </div>
 
-        <nav className={cn("flex-1 space-y-0.5 p-3", showCollapsed && "px-2")}>
-          {navItems.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href))
+        <nav className={cn("flex-1 space-y-1 overflow-y-auto p-3", showCollapsed && "px-2")}>
+          {!showCollapsed && (
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              My workspace
+            </p>
+          )}
+          {workspaceNavItems.map((item) => {
+            const active = !onAdminRoute && isNavActive(pathname, item.href, item.exact)
             const Icon = item.icon
-
             return (
               <Link
                 key={item.href}
@@ -149,6 +175,62 @@ export function PortalSidebar() {
               </Link>
             )
           })}
+
+          {isAdmin && (
+            <>
+              {!showCollapsed && (
+                <p className="mb-1 mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Platform admin
+                </p>
+              )}
+              {showCollapsed && <Separator className="my-2" />}
+              {platformNavItems.map((item) => {
+                const active = isNavActive(pathname, item.href, item.exact)
+                const Icon = item.icon
+                const showBadge =
+                  item.href === "/admin/users" && pendingUnblockCount > 0
+                return (
+                  <Link
+                    key={item.href}
+                    href={
+                      showBadge ? "/admin/users?needsAction=1" : item.href
+                    }
+                    onClick={handleNavClick}
+                    title={showCollapsed ? item.label : undefined}
+                    className={cn(
+                      "relative flex items-center rounded-lg py-2 text-sm transition-colors",
+                      showCollapsed ? "justify-center px-0" : "gap-3 px-3",
+                      active
+                        ? "bg-primary/90 font-medium text-primary-foreground"
+                        : "font-normal text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span
+                      className={cn(
+                        "overflow-hidden whitespace-nowrap transition-all duration-300",
+                        showCollapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                    {showBadge && (
+                      <Badge
+                        className={cn(
+                          "h-5 min-w-5 justify-center bg-amber-500 px-1.5 text-[10px] font-semibold text-amber-950",
+                          showCollapsed
+                            ? "absolute -right-0.5 -top-0.5"
+                            : "ml-auto"
+                        )}
+                      >
+                        {pendingUnblockCount > 9 ? "9+" : pendingUnblockCount}
+                      </Badge>
+                    )}
+                  </Link>
+                )
+              })}
+            </>
+          )}
         </nav>
 
         <div className={cn("p-3", showCollapsed && "px-2")}>

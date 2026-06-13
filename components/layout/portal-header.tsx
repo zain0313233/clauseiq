@@ -1,16 +1,20 @@
 "use client"
 
-import { Menu, Search } from "lucide-react"
+import { Menu, Search, Shield } from "lucide-react"
+import { usePathname } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-provider"
 import { useSidebar } from "./sidebar-context"
 import { NotificationBell } from "./notification-bell"
 
 export function PortalHeader() {
+  const pathname = usePathname()
   const { user } = useAuth()
   const { toggleSidebar } = useSidebar()
+  const onAdminRoute = pathname.startsWith("/admin")
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -37,10 +41,21 @@ export function PortalHeader() {
         <div className="relative hidden w-full max-w-md md:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search documents..."
+            placeholder={
+              onAdminRoute
+                ? "Platform admin — use page filters to search"
+                : "Search documents..."
+            }
             className="h-9 bg-muted/50 pl-9 text-sm placeholder:text-muted-foreground"
+            disabled={onAdminRoute}
           />
         </div>
+        {onAdminRoute && user?.role === "admin" && (
+          <Badge variant="outline" className="hidden gap-1 sm:inline-flex">
+            <Shield className="h-3 w-3" />
+            Admin mode
+          </Badge>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-2 md:gap-4">

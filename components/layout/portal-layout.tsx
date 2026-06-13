@@ -7,6 +7,8 @@ import { useRequireAuth } from "@/contexts/auth-provider"
 import { PortalSidebar } from "./portal-sidebar"
 import { PortalHeader } from "./portal-header"
 import { SidebarProvider } from "./sidebar-context"
+import { AccessRestrictedOverlay } from "@/components/access/access-restricted-overlay"
+import { AdminAccessAlertBanner } from "@/components/admin/admin-access-alert-banner"
 
 export function PortalLayout({
   children,
@@ -15,7 +17,7 @@ export function PortalLayout({
   children: React.ReactNode
   fullBleed?: boolean
 }) {
-  const { user, isLoading } = useRequireAuth()
+  const { user, isLoading, refreshUser } = useRequireAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function PortalLayout({
         <PortalSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <PortalHeader />
+          <AdminAccessAlertBanner isAdmin={user.role === "admin"} />
           <main
             className={
               fullBleed
@@ -48,6 +51,13 @@ export function PortalLayout({
             {children}
           </main>
         </div>
+        {user.role !== "admin" && (
+          <AccessRestrictedOverlay
+            open={!!user.accessRestricted}
+            unblockRequestPending={!!user.unblockRequestPending}
+            onRequestSent={() => void refreshUser()}
+          />
+        )}
       </div>
     </SidebarProvider>
   )

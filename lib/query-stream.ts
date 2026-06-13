@@ -6,6 +6,8 @@ export type StreamQueryHandlers = {
   onToken: (text: string) => void
   onSources?: (sources: QuerySource[]) => void
   onDone?: (confidence: QueryConfidence) => void
+  onWarning?: (text: string) => void
+  onAccessRestricted?: () => void
 }
 
 export async function streamDocumentQuery(
@@ -67,8 +69,21 @@ export async function streamDocumentQuery(
       return
     }
 
+    if (payload.type === 'warning' && typeof payload.text === 'string') {
+      handlers.onWarning?.(payload.text)
+      return
+    }
+
     if (payload.type === 'done' && typeof payload.confidence === 'string') {
       handlers.onDone?.(payload.confidence as QueryConfidence)
+      if (payload.access_restricted === true) {
+        handlers.onAccessRestricted?.()
+      }
+      return
+    }
+
+    if (payload.type === 'access_restricted') {
+      handlers.onAccessRestricted?.()
     }
   })
 }

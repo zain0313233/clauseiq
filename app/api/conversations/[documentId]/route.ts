@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import { userRepository } from "@/repositories/user.repository"
 import { documentRepository } from "@/repositories/document.repository"
 import { conversationRepository } from "@/repositories/conversation.repository"
@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { documentId } = await params
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     if (!hasPermission(user.role, "conversation:read")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })

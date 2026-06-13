@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import type { PortfolioFilter } from '@/lib/document-filters'
 import { parseLimit, parsePage } from '@/lib/pagination'
 import { documentRepository } from '@/repositories/document.repository'
@@ -16,7 +16,7 @@ const PORTFOLIO_FILTERS = new Set([
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const userId = user.id
     if (!hasPermission(user.role, 'document:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

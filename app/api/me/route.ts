@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
           email: user.email,
           role: user.role,
           emailVerified: user.emailVerified,
+          accessRestricted: user.accessRestricted,
+          unblockRequestPending: user.unblockRequestPending,
         },
       },
       { status: 200, headers: CACHE.noStore }

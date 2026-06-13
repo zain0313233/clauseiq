@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireEmailVerified } from '@/lib/auth-session'
+import { requirePortalAccess } from '@/lib/auth-session'
 import { notificationService } from '@/services/notification.service'
 import { markNotificationsReadSchema } from '@/validators/notification.schema'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireEmailVerified(req)
+    const user = await requirePortalAccess(req)
     const body = markNotificationsReadSchema.parse(await req.json())
 
     let unreadCount: number

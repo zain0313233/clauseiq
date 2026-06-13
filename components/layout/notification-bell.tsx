@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
+  ShieldAlert,
+  UserX,
   XCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -41,12 +43,20 @@ function notificationIcon(type: string) {
       return XCircle
     case "risk_alert":
       return AlertTriangle
+    case "unblock_request":
+      return ShieldAlert
+    case "user_access_restricted":
+      return UserX
     default:
       return FileText
   }
 }
 
 function notificationHref(n: AppNotification): string | null {
+  if (n.type === "unblock_request" || n.type === "user_access_restricted") {
+    return "/admin/users?needsAction=1"
+  }
+
   const docId = n.metadata?.documentId
   if (!docId) return null
   return `/dashboard/documents/${docId}`
@@ -120,7 +130,9 @@ export function NotificationBell() {
                   <span
                     className={cn(
                       "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                      n.type === "risk_alert"
+                      n.type === "unblock_request" || n.type === "user_access_restricted"
+                        ? "bg-amber-500/15 text-amber-400"
+                        : n.type === "risk_alert"
                         ? "bg-amber-500/15 text-amber-500"
                         : n.type.includes("failed")
                           ? "bg-red-500/15 text-red-400"
